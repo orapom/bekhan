@@ -511,6 +511,73 @@ def save_model_config(body: dict, _: None = Depends(_check_secret)):
     return {'ok': True}
 
 
+_PROMPT_CONFIG_PATH = os.path.join(os.path.dirname(os.getenv('DB_PATH', '/data/bekhan.db')), 'prompts_config.json')
+
+_DEFAULT_PROMPTS = {
+    "summary": (
+        "متن رونویسی این محتوا را برایم خلاصه کن.\n"
+        "یک خلاصه روایی نیم‌صفحه‌ای به فارسی روان بنویس — انگار دوستت برایت تعریف می‌کند چه چیزی در این ویدیو/صدا بود.\n"
+        "نه عنوان، نه لیست، نه بولت‌پوینت — فقط چند پاراگراف پیوسته که بگوید چه موضوعاتی مطرح شد، "
+        "چه نکات مهمی گفته شد، و پیام اصلی محتوا چیست.\n"
+        "حداقل ۱۵۰ کلمه و حداکثر ۳۰۰ کلمه."
+    ),
+    "correct": (
+        "You are correcting ASR errors in a transcript. Fix homophones, run-together words, misheard terms.\n"
+        "Return ONLY a JSON array of corrected strings, same count as input, same order.\n"
+        "Fix only clear errors. If uncertain, keep original. No explanations."
+    ),
+    "paragraphs": (
+        "متن زیر رونویسی خام یک محتوای رسانه‌ای است.\n"
+        "این متن را به یک بخش کتاب تبدیل کن:\n"
+        "۱. یک عنوان معنادار فارسی (۲ تا ۵ کلمه) برای این بخش بساز\n"
+        "۲. متن را به نثر روان و خوانا تبدیل کن\n"
+        "۳. پاراگراف‌بندی طبیعی با خط خالی بین پاراگراف‌ها\n"
+        "۴. همه محتوا را حفظ کن — فقط پاکسازی، نه حذف"
+    ),
+    "sacred": (
+        "بخش‌هایی از رونویسی که مستقیماً شامل متن عربی دینی هستند را شناسایی کن:\n"
+        "- آیات قرآنی (عربی)\n- احادیث یا روایات (عربی)\n- دعاها یا اذکار عربی\n"
+        "فقط اگر متن عربی دینی است شامل کن. متن فارسی یا توضیح دینی را شامل نکن."
+    ),
+    "quotes": (
+        "بخش‌هایی از رونویسی را شناسایی کن که در آن‌ها گوینده مستقیماً از شخص دیگر، کتاب، "
+        "مقاله یا منبع خارجی نقل‌قول می‌کند.\n"
+        "نقل‌قول مستقیم = گوینده کلام شخص دیگری را می‌خواند یا می‌آورد."
+    ),
+    "mentions": (
+        "اشخاص، کتاب‌ها، مکان‌ها و سازمان‌های ذکر شده در این محتوا را استخراج کن."
+    ),
+}
+
+
+def _load_prompt_config() -> dict:
+    try:
+        with open(_PROMPT_CONFIG_PATH) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_prompt_config(cfg: dict):
+    os.makedirs(os.path.dirname(_PROMPT_CONFIG_PATH), exist_ok=True)
+    with open(_PROMPT_CONFIG_PATH, 'w') as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+
+@app.get('/api/admin/prompt-config')
+def get_prompt_config():
+    current = _load_prompt_config()
+    return {'prompts': current, 'defaults': _DEFAULT_PROMPTS}
+
+
+@app.post('/api/admin/prompt-config')
+def save_prompt_config(body: dict, _: None = Depends(_check_secret)):
+    allowed = set(_DEFAULT_PROMPTS.keys())
+    new_cfg = {k: v for k, v in body.items() if k in allowed and isinstance(v, str)}
+    _save_prompt_config(new_cfg)
+    return {'ok': True}
+
+
 @app.post('/api/admin/test-model')
 async def test_model(body: dict):
     """Run a quick test prompt against specified models and return latency + snippet."""

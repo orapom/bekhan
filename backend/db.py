@@ -57,14 +57,15 @@ CREATE TABLE IF NOT EXISTS ai_content (
 );
 
 CREATE TABLE IF NOT EXISTS pipeline_state (
-    item_id    TEXT NOT NULL,
-    step       TEXT NOT NULL,
-    language   TEXT NOT NULL DEFAULT '_',
-    status     TEXT DEFAULT 'pending',
-    started_at TEXT,
-    done_at    TEXT,
-    error_msg  TEXT,
-    model_used TEXT,
+    item_id      TEXT NOT NULL,
+    step         TEXT NOT NULL,
+    language     TEXT NOT NULL DEFAULT '_',
+    status       TEXT DEFAULT 'pending',
+    started_at   TEXT,
+    done_at      TEXT,
+    error_msg    TEXT,
+    model_used   TEXT,
+    progress_pct INTEGER DEFAULT 0,
     PRIMARY KEY (item_id, step, language)
 );
 """
@@ -81,12 +82,16 @@ def get_conn() -> sqlite3.Connection:
 def init_db():
     with get_conn() as conn:
         conn.executescript(SCHEMA)
-        # live migration: add model_used if missing (existing DBs)
-        try:
-            conn.execute("ALTER TABLE pipeline_state ADD COLUMN model_used TEXT")
-            conn.commit()
-        except Exception:
-            pass
+        for migration in [
+            "ALTER TABLE pipeline_state ADD COLUMN model_used TEXT",
+            "ALTER TABLE pipeline_state ADD COLUMN progress_pct INTEGER DEFAULT 0",
+            "ALTER TABLE transcript_segments ADD COLUMN speaker TEXT",
+        ]:
+            try:
+                conn.execute(migration)
+                conn.commit()
+            except Exception:
+                pass
 
 
 def _now():
@@ -250,27 +255,39 @@ def list_items(limit: int = 100, source: str = None, status: str = None,
 
 def set_pipeline_state(item_id: str, step: str, status: str,
                        language: str = '_', error_msg: str | None = None,
-                       model_used: str | None = None):
+                       model_used: str | None = None, progress_pct: int | None = None):
     conn = get_conn()
     try:
         now = _now()
         if status == 'running':
-            conn.execute(
-                "INSERT OR REPLACE INTO pipeline_state "
-                "(item_id, step, language, status, started_at, done_at, error_msg, model_used) "
-                "VALUES (?, ?, ?, 'running', ?, NULL, NULL, NULL)",
-                (item_id, step, language, now)
-            )
+            existing = conn.execute(
+                "SELECT started_at FROM pipeline_state WHERE item_id=? AND step=? AND language=?",
+                (item_id, step, language)
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    "UPDATE pipeline_state SET status='running', progress_pct=? "
+                    "WHERE item_id=? AND step=? AND language=?",
+                    (progress_pct or 0, item_id, step, language)
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO pipeline_state "
+                    "(item_id, step, language, status, started_at, done_at, error_msg, model_used, progress_pct) "
+                    "VALUES (?, ?, ?, 'running', ?, NULL, NULL, NULL, ?)",
+                    (item_id, step, language, now, progress_pct or 0)
+                )
         else:
+            pct = 100 if status == 'done' else (progress_pct or 0)
             conn.execute(
                 "INSERT OR REPLACE INTO pipeline_state "
-                "(item_id, step, language, status, started_at, done_at, error_msg, model_used) "
+                "(item_id, step, language, status, started_at, done_at, error_msg, model_used, progress_pct) "
                 "VALUES (?, ?, ?, ?, "
                 "COALESCE((SELECT started_at FROM pipeline_state WHERE item_id=? AND step=? AND language=?), ?), "
-                "?, ?, ?)",
+                "?, ?, ?, ?)",
                 (item_id, step, language, status,
                  item_id, step, language, now,
-                 now, error_msg, model_used)
+                 now, error_msg, model_used, pct)
             )
         conn.commit()
     finally:
@@ -281,7 +298,7 @@ def get_pipeline_progress(item_id: str) -> list:
     conn = get_conn()
     try:
         rows = conn.execute(
-            "SELECT step, language, status, started_at, done_at, error_msg, model_used "
+            "SELECT step, language, status, started_at, done_at, error_msg, model_used, progress_pct "
             "FROM pipeline_state WHERE item_id=? ORDER BY started_at",
             (item_id,)
         ).fetchall()

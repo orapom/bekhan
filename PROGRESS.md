@@ -123,28 +123,49 @@ Single file, ~1900 lines, RTL, Persian, dark/light theme, no build step.
 
 ---
 
+## ✅ Done (session 2 — this session)
+
+### Parallel Transcription + Progress
+- [x] `progress_pct INTEGER` column on `pipeline_state` (+ live migration)
+- [x] `transcribe_audio()` processes chunks in parallel (`asyncio.gather` + `Semaphore(4)`)
+- [x] `on_progress(done, total)` callback updates `progress_pct` in DB per chunk
+- [x] Item title passed as `prompt` to ASR for better accuracy + `timestamp_granularities[]=word` attempted
+- [x] Media page shows per-step progress bars (`#pl-proc`) while pipeline runs; 2s polling; hides when done
+
+### Dual-Model Transcription (optional, off by default)
+- [x] `transcribe_audio_dual()` — runs top-2 ASR models per chunk in parallel, LLM merges
+- [x] Enable via `"asr_dual": true` in `/data/model_config.json`
+
+### Better Summary
+- [x] `summarize_fa()` prompt: half-page narrative (~150-300 words), conversational, no bullet points
+
+### Configurable Prompts
+- [x] `_load_prompts()` in `ai_client.py` — loads `/data/prompts_config.json`
+- [x] `correct`, `paragraphs`, `summarize` all check for custom instruction overrides
+- [x] `GET /api/admin/prompt-config` + `POST /api/admin/prompt-config`
+- [x] Admin UI: textarea per task (summary, correct, paragraphs, sacred, quotes, mentions)
+
+### Chapter Markers on Player
+- [x] `#ch-strip` — clickable chapter markers at correct timeline positions (RTL-aware %)
+- [x] Doubles as progress indicator (gold overlay updates with `_onTick`)
+- [x] Current chapter highlighted in sidebar list while playing
+
+### Topic % Normalization
+- [x] Weights normalized to actual % (sum → 100%) instead of N/5
+
+---
+
 ## 🔴 Not Done / Pending
 
 ### Speaker Diarization (next priority)
-Neither GPT-4o-Transcribe nor Whisper-1 returns speaker labels. Plan: LLM post-processing step after `correct` in pipeline.
 
-**What needs building:**
-1. `db.py`: `ALTER TABLE transcript_segments ADD COLUMN speaker TEXT` (live migration)
-2. `ai_client.py`: `diarize_speakers(segments, title)` async function
-   - Sends batches of 100 segments to LLM
-   - LLM returns `{is_multi_speaker, assignments: [{seg_index, speaker}], names: {A: "...", B: "..."}}`
-   - Stores speaker→name map in `ai_content` as `speaker_names` type
-3. `tasks.py`: `diarize_item` task — runs after `correct_transcript`, before `generate_paragraphs`
-   - Only runs if `is_multi_speaker=true`
-   - Updates `transcript_segments.speaker` column per seg_index
-4. Update `_pipeline_chain()` to insert `diarize_item.si(item_id)` after `correct_transcript`
-5. `api.py`: `GET /api/items/{id}/transcript` — add `speaker` field to segment response
-6. `api.py`: `GET /api/items/{id}/speakers` — return speaker list + names
-7. `frontend/index.html`:
-   - Speaker color map: A=gold, B=teal, C=orange, D=purple, etc.
-   - Show speaker chip/label before each segment in karaoke mode
-   - Speaker legend above transcript (click to filter/highlight)
-   - In book mode, paragraph header shows speaker name if consistent
+Neither GPT-4o-Transcribe nor Whisper-1 returns speaker labels. Plan: LLM post-processing step after `correct`.
+
+- [x] DB column `speaker TEXT` already in `transcript_segments` migration
+- [ ] `ai_client.py`: `diarize_speakers(segments, title)` — sends batches to LLM, returns speaker assignments
+- [ ] `tasks.py`: `diarize_item` task after `correct_transcript`, before `generate_paragraphs`
+- [ ] `api.py`: transcript endpoint returns `speaker` field; add `/speakers` endpoint
+- [ ] Frontend: speaker chips in karaoke, speaker legend, color per speaker (A=gold, B=teal, C=orange)
 
 ### YouTube Network Block
 - YouTube SSL `UNEXPECTED_EOF_WHILE_READING` from Docker container — likely network/VPN issue on this machine
@@ -266,3 +287,28 @@ MODEL_URLS={"DeepSeek-V3.2": "...", "Whisper-1": "...", ...}
 ```
 
 API key goes in `.apikey` (single line).
+
+
+added extra todos:
+
+for some videos i want to use both transcribe models and then merge the result with ai to get a better result, for medias with lower quality or when a person isnt promouncing everytging very good.
+
+for testing models, i want you to create a comperhensive test, run a sample 10 minute video from aparat like this:
+https://www.aparat.com/v/fgk23zg
+and compare transcribe with each model, or both models, then other parts like summary and stuff, everything 
+i want to see comparison in speed and quality, use best model you have for evaluating quality
+
+i think maybe event different configurations for models should be tested, for transcribe, there are alot of parameters i think, i want to use best params for best result in transcribe, even use both models if needed. i want to know what are downsides of using better params
+
+
+i would like to see progress for different tasks in processing, percentage per task if possible, i would like transcribtions to be in batches and in parallel to be faster. small chunks, parallel, and show progress in both admin page and the media page. crop on smart places if possible. like in silences. i want to see progress of everything and the models used in both media page and admin page very clearly
+
+i would also like sectioning of video and audios like in youtube. its already present in سرفصل ها but i want to see the same thing on player also.
+
+i also want to see what percentage of the media is about each topic
+
+
+summary should be really summaty not an intro. like a half pager like someone is telling me what is in the media
+
+
+prompts shpuld be configurable in admin panel too

@@ -108,6 +108,24 @@ main#ct{padding:1.6rem;min-width:0}
 .ch-ts{font-size:.63rem;font-family:var(--ff-mono);color:var(--mu);flex-shrink:0;min-width:2.4rem;padding-top:.1rem}
 .ch-t{font-size:.86rem;flex:1;line-height:1.4}
 .ch-snip{font-size:.72rem;color:var(--mu);line-height:1.4;margin-top:.15rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+/* Chapter strip & proc panel */
+.ch-strip{position:relative;height:18px;background:var(--surf);border-radius:2px;margin:.25rem 0 .65rem;cursor:pointer;overflow:hidden}
+.ch-prog{position:absolute;top:0;left:0;height:100%;background:var(--gold);opacity:.15;pointer-events:none}
+.ch-mark{position:absolute;top:0;width:2px;height:100%;background:var(--gold);opacity:.5;transition:opacity .15s;z-index:1}
+.ch-mark:hover{opacity:1;width:3px}
+.ch-tip{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--line);padding:2px 6px;border-radius:3px;font-size:.6rem;white-space:nowrap;display:none;z-index:5;pointer-events:none}
+.ch-mark:hover .ch-tip{display:block}
+.pl-proc{background:var(--surf);border:1px solid var(--line);border-radius:var(--r);padding:.6rem .85rem;margin-bottom:.7rem}
+.proc-hd{font-size:.7rem;font-weight:600;color:var(--mu);margin-bottom:.35rem;font-family:var(--ff-ui)}
+.proc-row{display:flex;align-items:center;gap:.5rem;margin:.12rem 0}
+.proc-nm{font-size:.7rem;min-width:5.5rem;color:var(--tx)}
+.proc-bg{flex:1;height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+.proc-bar{height:100%;background:var(--gold);border-radius:2px;transition:width .4s}
+.proc-bar.done{background:var(--ok)}
+.proc-bar.err{background:var(--err)}
+.proc-pct{font-size:.63rem;color:var(--mu);min-width:2.2rem;text-align:left;font-family:var(--ff-mono)}
+.prompt-ta{width:100%;min-height:68px;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);color:var(--tx);font-size:.73rem;font-family:var(--ff-mono);padding:.45rem .6rem;resize:vertical;direction:rtl;box-sizing:border-box}
+.prompt-ta:focus{outline:none;border-color:var(--gold)}
 .tr-toolbar{display:flex;align-items:center;gap:.4rem;margin-bottom:.75rem;flex-wrap:wrap}
 .tmbtn{padding:.2em .6em;border-radius:var(--r);font-size:.68rem;font-family:var(--ff-ui);background:none;border:1px solid transparent;color:var(--mu);cursor:pointer}
 .tmbtn.on{background:var(--surf);border-color:var(--line);color:var(--tx)}
@@ -294,6 +312,10 @@ mark{background:rgba(126,184,247,.25);color:var(--gold);border-radius:.15em}
           <div id="pl-audio-area" style="display:none">
             <canvas id="wv" height="60" style="width:100%;background:var(--surf);border-radius:var(--r);margin-bottom:.9rem"></canvas>
           </div>
+          <!-- chapter/timeline strip — clickable markers, doubles as progress bar -->
+          <div id="ch-strip" class="ch-strip" style="display:none"></div>
+          <!-- pipeline processing status — visible while item is being processed -->
+          <div id="pl-proc" class="pl-proc" style="display:none"></div>
           <div class="p-ctrl">
             <div class="pl-hdr">
               <div class="pl-thumb" id="pl-thumb"><span style="font-size:2rem;opacity:.3">▶</span></div>
@@ -416,6 +438,12 @@ mark{background:rgba(126,184,247,.25);color:var(--gold);border-radius:.15em}
           </div>
         </div>
       </div>
+
+      <div class="sec-lbl" style="margin-top:.4rem"><span class="sec-ic">✍</span>دستورالعمل‌های هوش مصنوعی
+        <button class="tmbtn on" id="prompt-save-btn" onclick="savePromptConfig()" style="margin-right:auto;font-size:.7rem">ذخیره</button>
+        <button class="tmbtn" onclick="resetPromptConfig()" style="font-size:.7rem">پیش‌فرض</button>
+      </div>
+      <div id="prompt-cfg-wrap" style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem"></div>
 
       <div class="sec-lbl" style="margin-top:.4rem"><span class="sec-ic">≡</span>آیتم‌ها</div>
       <div style="overflow-x:auto">
@@ -847,6 +875,20 @@ function _onTick() {
   if (timeEl) timeEl.textContent = fmtTime(t) + ' / ' + fmtTime(dur);
   _karaokeSync(t);
   _drawWaveform(t, dur);
+  // chapter strip progress bar
+  const chProg = document.getElementById('ch-prog-bar');
+  if (chProg) chProg.style.width = pct + '%';
+  _highlightCurrentChapter(t);
+}
+
+function _highlightCurrentChapter(t) {
+  if (!ST.paragraphs.length) return;
+  let cur = 0;
+  for (let i = 0; i < ST.paragraphs.length; i++) {
+    if ((ST.paragraphs[i].start_sec || 0) <= t) cur = i; else break;
+  }
+  const chItems = document.querySelectorAll('#ch-list .ch-item');
+  chItems.forEach((el, i) => el.classList.toggle('on', i === cur));
 }
 
 function _updatePlayBtns() {
@@ -1169,6 +1211,37 @@ function setTrMode(mode) {
   renderTranscript();
 }
 
+function renderChapterStrip() {
+  const strip = document.getElementById('ch-strip');
+  if (!strip) return;
+  strip.innerHTML = '';
+  const dur = ST.item?.duration_sec;
+  if (!dur || !ST.paragraphs.length) { strip.style.display = 'none'; return; }
+  strip.style.display = '';
+  const prog = document.createElement('div');
+  prog.id = 'ch-prog-bar';
+  prog.className = 'ch-prog';
+  strip.appendChild(prog);
+  ST.paragraphs.forEach((p) => {
+    if (p.start_sec == null) return;
+    const pct = Math.min(99.5, (p.start_sec / dur) * 100);
+    const mark = document.createElement('div');
+    mark.className = 'ch-mark';
+    mark.style.right = pct + '%';
+    const tip = document.createElement('div');
+    tip.className = 'ch-tip';
+    tip.textContent = (p.title_fa || '') + ' · ' + fmtTime(p.start_sec);
+    mark.appendChild(tip);
+    mark.addEventListener('click', e => { e.stopPropagation(); Player.seek(p.start_sec); });
+    strip.appendChild(mark);
+  });
+  strip.addEventListener('click', e => {
+    const rect = strip.getBoundingClientRect();
+    const frac = 1 - (e.clientX - rect.left) / rect.width;
+    Player.seek(frac * dur);
+  });
+}
+
 function renderChapters() {
   const el = document.getElementById('ch-list');
   el.innerHTML = '';
@@ -1184,6 +1257,7 @@ function renderChapters() {
     item.onclick = () => Player.seek(p.start_sec || 0);
     el.appendChild(item);
   });
+  renderChapterStrip();
 
   // Timeline from infographic
   if (ST.ai?.['infographic_fa']?.content) {
@@ -1223,11 +1297,13 @@ function renderAnalysis(ai) {
   }
 
   if (igData?.topic_map?.length) {
+    const topics = igData.topic_map.slice(0,6);
+    const totalW = topics.reduce((s, t) => s + (t.weight||1), 0) || 1;
     html += `<div class="sum-block"><div class="sum-ll">موضوعات</div><div class="ig">`;
-    igData.topic_map.slice(0,5).forEach(t => {
-      const pct = Math.round((t.weight||1)/5*100);
+    topics.forEach(t => {
+      const pct = Math.round(((t.weight||1) / totalW) * 100);
       html += `<div class="tb-item">
-        <div class="tb-lbl"><span>${esc(t.topic||'')}</span><span>${t.weight||1}/5</span></div>
+        <div class="tb-lbl"><span>${esc(t.topic||'')}</span><span>${pct}٪</span></div>
         <div class="tb-bg"><div class="tb-f" style="width:${pct}%"></div></div>
         ${(t.subtopics||[]).length ? `<div class="tb-subs">${t.subtopics.slice(0,4).map(s=>`<span class="sub-pill">${esc(s)}</span>`).join('')}</div>` : ''}
       </div>`;
@@ -1272,16 +1348,44 @@ function renderMentions(data) {
 }
 
 async function pollProgress(id) {
+  if (ST.id !== id) return;
   try {
     const data = await fetch(`/api/items/${id}/progress`).then(r => r.json());
     const steps = data.steps || [];
-    const done = steps.some(s => s.status === 'done');
-    if (done) {
+    renderProcPanel(steps);
+    const artworkDone = steps.some(s => s.step === 'artwork' && s.status === 'done');
+    const anyRunning = steps.some(s => s.status === 'running');
+    if (artworkDone || (!anyRunning && steps.length > 0)) {
       const item = await fetch(`/api/items/${id}`).then(r => r.json());
-      if (['done','error'].includes(item.status)) { loadAI(id); return; }
+      if (['done','error'].includes(item.status)) {
+        document.getElementById('pl-proc').style.display = 'none';
+        loadAI(id);
+        return;
+      }
     }
-    setTimeout(() => pollProgress(id), 3000);
+    setTimeout(() => pollProgress(id), 2000);
   } catch { setTimeout(() => pollProgress(id), 5000); }
+}
+
+function renderProcPanel(steps) {
+  const el = document.getElementById('pl-proc');
+  if (!el) return;
+  const anyActive = steps.some(s => s.status === 'running' || (s.status !== 'done' && s.status !== 'error' && s.status !== 'pending'));
+  const allDone = steps.length > 0 && steps.every(s => s.status === 'done' || s.status === 'error');
+  if (allDone) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  let html = `<div class="proc-hd">در حال پردازش</div>`;
+  steps.forEach(s => {
+    const pct = s.status === 'done' ? 100 : s.status === 'error' ? 100 : (s.progress_pct || 0);
+    const barCls = s.status === 'done' ? 'done' : s.status === 'error' ? 'err' : '';
+    const pctLbl = s.status === 'done' ? '✓' : s.status === 'error' ? '✗' : s.status === 'running' && pct > 0 ? pct + '%' : s.status === 'running' ? '⟳' : '';
+    html += `<div class="proc-row">
+      <span class="proc-nm">${STEP_NAMES[s.step]||s.step}</span>
+      <div class="proc-bg"><div class="proc-bar ${barCls}" style="width:${pct}%"></div></div>
+      <span class="proc-pct">${pctLbl}</span>
+    </div>`;
+  });
+  el.innerHTML = html;
 }
 
 // ── rate cycling ──────────────────────────────────────────────────────────────
@@ -1537,12 +1641,13 @@ async function loadQueue() {
 const STEP_NAMES = {import:'دانلود',transcribe:'رونویسی',correct:'اصلاح',paragraphs:'فصل‌بندی',summarize:'خلاصه',mentions:'اشاره‌ها',infographic:'اینفوگرافیک',sacred:'متون مقدس',quotes:'نقل‌قول‌ها',artwork:'آرت‌ورک'};
 
 async function loadAdmin() {
-  const [stats, pipeStats, workers, itemsResp, modelCfg] = await Promise.all([
+  const [stats, pipeStats, workers, itemsResp, modelCfg, promptCfg] = await Promise.all([
     fetch('/api/stats').then(r => r.json()),
     fetch('/api/admin/pipeline-stats').then(r => r.json()),
     fetch('/api/admin/workers').then(r => r.json()),
     fetch('/api/items?limit=50').then(r => r.json()),
     fetch('/api/admin/model-config').then(r => r.json()),
+    fetch('/api/admin/prompt-config').then(r => r.json()).catch(() => ({prompts:{},defaults:{}})),
   ]);
 
   // Worker indicator
@@ -1595,6 +1700,10 @@ async function loadAdmin() {
     sel.onchange = () => { if(sel.value) { addModelToCat(cat, sel.value); sel.value=''; } };
     renderCatList(cat, catModels, available);
   });
+
+  // Prompt config editor
+  ST._promptCfg = promptCfg;
+  renderPromptConfig(promptCfg);
 
   // Items table with per-step detail on expand
   const tbody = document.getElementById('admin-tbody');
@@ -1695,13 +1804,15 @@ async function toggleSteps(id, btn) {
         <th style="text-align:right;padding:.2rem .4rem">مرحله</th>
         <th style="padding:.2rem .4rem">وضعیت</th>
         <th style="padding:.2rem .4rem;font-family:var(--ff-mono)">زمان (ث)</th>
+        <th style="padding:.2rem .4rem;font-family:var(--ff-mono)">پیشرفت</th>
         <th style="padding:.2rem .4rem;font-family:var(--ff-mono)">مدل</th>
       </tr></thead>
       <tbody>${steps.map(s => `
         <tr style="border-top:1px solid var(--line)">
           <td style="padding:.25rem .4rem">${STEP_NAMES[s.step]||s.step}</td>
           <td style="padding:.25rem .4rem">${statusPill(s.status)}</td>
-          <td style="padding:.25rem .4rem;font-family:var(--ff-mono);color:var(--mu)">${s.duration_sec != null ? s.duration_sec : s.status==='running'?'⟳':'-'}</td>
+          <td style="padding:.25rem .4rem;font-family:var(--ff-mono);color:var(--mu)">${s.duration_sec != null ? s.duration_sec+'ث' : s.status==='running'?'⟳':'-'}</td>
+          <td style="padding:.25rem .4rem;font-family:var(--ff-mono);color:var(--mu)">${s.status==='running'&&s.progress_pct>0 ? s.progress_pct+'%' : s.status==='done'?'100%':'-'}</td>
           <td style="padding:.25rem .4rem;font-family:var(--ff-mono);font-size:.68rem;color:var(--gold)">${esc(s.model_used||'')}</td>
         </tr>`).join('')}
       </tbody></table>`;
@@ -1741,6 +1852,59 @@ async function runModelTest() {
   } catch(e) {
     resEl.innerHTML = `<div class="msg">خطا: ${esc(e.message)}</div>`;
   }
+}
+
+const PROMPT_LABELS = {
+  summary:'خلاصه‌سازی', correct:'اصلاح رونویسی',
+  paragraphs:'فصل‌بندی', sacred:'متون مقدس',
+  quotes:'نقل‌قول‌ها', mentions:'اشاره‌ها',
+};
+
+function renderPromptConfig(cfg) {
+  const wrap = document.getElementById('prompt-cfg-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  const cur = cfg.prompts || {};
+  const def = cfg.defaults || {};
+  Object.entries(PROMPT_LABELS).forEach(([key, label]) => {
+    const div = document.createElement('div');
+    div.className = 'panel';
+    const val = cur[key] || '';
+    div.innerHTML = `<div class="p-hd"><span class="p-hd-ic">✎</span>${label}</div>
+      <div class="p-bd" style="padding:.6rem">
+        <textarea class="prompt-ta" id="prompt-ta-${key}" placeholder="${esc(def[key]||'')}">${esc(val)}</textarea>
+        <div style="font-size:.63rem;color:var(--mu);margin-top:.25rem">خالی = دستورالعمل پیش‌فرض</div>
+      </div>`;
+    wrap.appendChild(div);
+  });
+}
+
+async function savePromptConfig() {
+  const btn = document.getElementById('prompt-save-btn');
+  btn.textContent = '...';
+  btn.disabled = true;
+  const prompts = {};
+  Object.keys(PROMPT_LABELS).forEach(key => {
+    const el = document.getElementById('prompt-ta-' + key);
+    if (el && el.value.trim()) prompts[key] = el.value.trim();
+  });
+  try {
+    await fetch('/api/admin/prompt-config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(prompts),
+    });
+  } catch(e) { alert('خطا: ' + e.message); }
+  btn.textContent = 'ذخیره';
+  btn.disabled = false;
+}
+
+function resetPromptConfig() {
+  Object.keys(PROMPT_LABELS).forEach(key => {
+    const el = document.getElementById('prompt-ta-' + key);
+    if (el) el.value = '';
+  });
+  savePromptConfig();
 }
 
 async function reprocess(id) {

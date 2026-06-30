@@ -36,10 +36,12 @@ def _run(coro):
 
 
 def _ps(item_id: str, step: str, status: str, lang: str = '_',
-        err: str | None = None, model: str | None = None):
+        err: str | None = None, model: str | None = None,
+        progress_pct: int | None = None):
     try:
         db.set_pipeline_state(item_id, step, status, language=lang,
-                              error_msg=err, model_used=model)
+                              error_msg=err, model_used=model,
+                              progress_pct=progress_pct)
     except Exception:
         pass
 
@@ -208,9 +210,23 @@ def transcribe_item(self, item_id: str):
     _ps(item_id, 'transcribe', 'running')
     db.set_status(item_id, 'transcribing')
     try:
-        from ai_client import transcribe_audio
+        from ai_client import transcribe_audio, transcribe_audio_dual, _model_config
         lang = item.get('language') or 'fa'
-        seg_list = _run(transcribe_audio(audio_path, language=lang))
+        title_hint = ((item.get('title') or item.get('title_fa') or '')[:150])
+
+        def _on_progress(done: int, total: int):
+            pct = int(done / total * 100) if total > 0 else 0
+            _ps(item_id, 'transcribe', 'running', progress_pct=pct)
+
+        dual = _model_config().get('asr_dual', False)
+        if dual:
+            seg_list = _run(transcribe_audio_dual(audio_path, language=lang,
+                                                   context_hint=title_hint,
+                                                   on_progress=_on_progress))
+        else:
+            seg_list = _run(transcribe_audio(audio_path, language=lang,
+                                             context_hint=title_hint,
+                                             on_progress=_on_progress))
         asr_model = _m()
         db.save_segments(item_id, 'fa', seg_list)
         dur = None
@@ -218,7 +234,7 @@ def transcribe_item(self, item_id: str):
             dur = seg_list[-1]['end']
         db.upsert_item({'id': item_id, 'duration_sec': dur, 'status': 'transcribed'})
         _ps(item_id, 'transcribe', 'done', model=asr_model)
-        log.info("transcribed %d segments for %s", len(seg_list), item_id)
+        log.info("transcribed %d segments for %s (dual=%s)", len(seg_list), item_id, dual)
         return item_id
     except Exception as exc:
         _ps(item_id, 'transcribe', 'error', err=str(exc))
@@ -293,7 +309,7 @@ def generate_paragraphs(self, item_id: str):
     if not segs_raw:
         return item_id
 
-    item = db.get_item(item_id)
+    item = db.get_item(item_id) or {}
     seg_dicts = [{'start': r['start_sec'], 'end': r['end_sec'],
                   'text': r['text'], 'seg_index': r['seg_index']}
                  for r in segs_raw]

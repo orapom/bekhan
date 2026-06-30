@@ -43,6 +43,16 @@ def _asr_order() -> list[str]:
     return cfg.get('asr') or _ASR_FALLBACK_ORDER
 
 
+def _load_prompts() -> dict:
+    """Load custom prompt instructions from /data/prompts_config.json."""
+    cfg_dir = os.path.dirname(os.getenv('DB_PATH', '/data/bekhan.db'))
+    try:
+        with open(os.path.join(cfg_dir, 'prompts_config.json')) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
 async def chat(messages: list[dict],
                temperature: float = 0.3,
                max_tokens: int = 4096,
@@ -166,9 +176,14 @@ def _split_audio_chunks(audio_path: str, max_mb: float = 19.0, overlap_sec: floa
     return chunks
 
 
-async def _call_asr(url: str, model: str, audio_bytes: bytes, language: str) -> list:
+async def _call_asr(url: str, model: str, audio_bytes: bytes, language: str,
+                   context_hint: str = '') -> list:
     auth = {"Authorization": f"Bearer {API_KEY}"}
+    hint = context_hint[:200] if context_hint else ''
     attempts = [
+        {'model': model, 'language': language, 'response_format': 'verbose_json',
+         'timestamp_granularities[]': 'word', 'prompt': hint},
+        {'model': model, 'language': language, 'response_format': 'verbose_json', 'prompt': hint},
         {'model': model, 'language': language, 'response_format': 'verbose_json'},
         {'model': model, 'language': language, 'response_format': 'json'},
         {'model': model, 'response_format': 'verbose_json'},
@@ -237,7 +252,7 @@ def _asr_model_id(config_key: str) -> str:
     return mapping.get(config_key, config_key.lower())
 
 
-async def _transcribe_bytes(audio_bytes: bytes, language: str) -> list:
+async def _transcribe_bytes(audio_bytes: bytes, language: str, context_hint: str = '') -> list:
     available = [(m, MODEL_URLS[m]) for m in _asr_order() if m in MODEL_URLS]
     if not available:
         raise RuntimeError("No ASR URL configured")
@@ -247,7 +262,7 @@ async def _transcribe_bytes(audio_bytes: bytes, language: str) -> list:
         model_id = _asr_model_id(config_key)
         url = model_url.rstrip('/') + '/audio/transcriptions'
         try:
-            result = await _call_asr(url, model_id, audio_bytes, language)
+            result = await _call_asr(url, model_id, audio_bytes, language, context_hint)
             if result:
                 _last_model['name'] = config_key
                 return result
@@ -258,41 +273,85 @@ async def _transcribe_bytes(audio_bytes: bytes, language: str) -> list:
     return []
 
 
-async def transcribe_audio(audio_path: str, language: str = 'fa') -> list:
-    import shutil
+async def _transcribe_bytes_single(audio_bytes: bytes, language: str,
+                                    model_key: str, context_hint: str = '') -> list:
+    """Transcribe with a specific model (no fallback chain)."""
+    if model_key not in MODEL_URLS:
+        return []
+    model_id = _asr_model_id(model_key)
+    url = MODEL_URLS[model_key].rstrip('/') + '/audio/transcriptions'
+    try:
+        return await _call_asr(url, model_id, audio_bytes, language, context_hint)
+    except Exception as exc:
+        log.warning("_transcribe_bytes_single %s: %s", model_key, exc)
+        return []
+
+
+def _assemble_chunks(results: list, overlap_sec: float = 3.0) -> list:
+    """Merge sorted (chunk_idx, segs, nom_start) list into final segment list."""
+    all_segments = []
+    for enum_i, (_, segs, nom_start) in enumerate(results):
+        if not segs:
+            continue
+        actual_start = max(0.0, nom_start - overlap_sec) if enum_i > 0 else nom_start
+        for seg in segs:
+            s_rel = seg.get('start')
+            e_rel = seg.get('end')
+            if s_rel is None:
+                all_segments.append({'start': None, 'end': None, 'text': seg['text']})
+                continue
+            s_abs = actual_start + s_rel
+            e_abs = actual_start + e_rel if e_rel is not None else None
+            if s_abs < nom_start and enum_i > 0:
+                continue
+            out_seg = {'start': round(s_abs, 2),
+                       'end': round(e_abs, 2) if e_abs is not None else None,
+                       'text': seg['text']}
+            if seg.get('words'):
+                out_seg['words'] = [
+                    {'word': w['word'],
+                     'start': round(actual_start + w['start'], 2),
+                     'end': round(actual_start + w['end'], 2)}
+                    for w in seg['words']
+                ]
+            all_segments.append(out_seg)
+    return all_segments
+
+
+async def transcribe_audio(audio_path: str, language: str = 'fa',
+                           context_hint: str = '',
+                           on_progress=None) -> list:
+    """Transcribe audio file. Chunks are processed in parallel (up to 4 concurrent)."""
+    import shutil, asyncio
     chunks = _split_audio_chunks(audio_path, max_mb=19.0, overlap_sec=3.0)
     is_split = len(chunks) > 1 or chunks[0][0] != audio_path
+    n = len(chunks)
+    sem = asyncio.Semaphore(4)
+    done_count = [0]
 
-    all_segments = []
-    try:
-        for i, (chunk_path, nom_start, _) in enumerate(chunks):
+    async def _do_chunk(idx: int, chunk_path: str, nom_start: float):
+        async with sem:
             with open(chunk_path, 'rb') as f:
-                audio_bytes = f.read()
-            segs = await _transcribe_bytes(audio_bytes, language)
-            if not segs:
-                continue
-            actual_start = max(0.0, nom_start - 3.0) if i > 0 else nom_start
-            for seg in segs:
-                s_rel = seg.get('start')
-                e_rel = seg.get('end')
-                if s_rel is None:
-                    all_segments.append({'start': None, 'end': None, 'text': seg['text']})
-                    continue
-                s_abs = actual_start + s_rel
-                e_abs = actual_start + e_rel if e_rel is not None else None
-                if s_abs < nom_start and i > 0:
-                    continue
-                out_seg = {'start': round(s_abs, 2),
-                           'end': round(e_abs, 2) if e_abs is not None else None,
-                           'text': seg['text']}
-                if seg.get('words'):
-                    out_seg['words'] = [
-                        {'word': w['word'],
-                         'start': round(actual_start + w['start'], 2),
-                         'end': round(actual_start + w['end'], 2)}
-                        for w in seg['words']
-                    ]
-                all_segments.append(out_seg)
+                data = f.read()
+            segs = await _transcribe_bytes(data, language, context_hint)
+            done_count[0] += 1
+            if on_progress:
+                try:
+                    on_progress(done_count[0], n)
+                except Exception:
+                    pass
+            return (idx, segs, nom_start)
+
+    raw = await asyncio.gather(
+        *[_do_chunk(i, cp, ns) for i, (cp, ns, _) in enumerate(chunks)],
+        return_exceptions=True,
+    )
+    results = sorted(
+        [r for r in raw if not isinstance(r, BaseException)],
+        key=lambda x: x[0],
+    )
+    try:
+        return _assemble_chunks(results)
     finally:
         if is_split:
             tmpdir = os.path.dirname(chunks[0][0])
@@ -300,7 +359,91 @@ async def transcribe_audio(audio_path: str, language: str = 'fa') -> list:
                 shutil.rmtree(tmpdir, ignore_errors=True)
             except Exception:
                 pass
-    return all_segments
+
+
+async def _merge_dual_transcripts(segs_a: list, segs_b: list,
+                                   model_a: str, model_b: str) -> list:
+    """LLM picks/merges two ASR results for the same audio chunk."""
+    if not segs_a:
+        return segs_b
+    if not segs_b:
+        return segs_a
+    text_a = ' '.join(s['text'] for s in segs_a).strip()
+    text_b = ' '.join(s['text'] for s in segs_b).strip()
+    if text_a == text_b:
+        return segs_a
+    prompt = (
+        f"دو رونویسی از یک بخش صوتی دارم:\n"
+        f"مدل {model_a}:\n{text_a}\n\n"
+        f"مدل {model_b}:\n{text_b}\n\n"
+        "بهترین رونویسی را انتخاب کن یا ترکیب کن تا دقیق‌ترین متن حاصل شود. "
+        "فقط متن نهایی را بدون توضیح برگردان."
+    )
+    try:
+        merged = await chat([{"role": "user", "content": prompt}], temperature=0.1, max_tokens=2048)
+        merged = merged.strip()
+        base = segs_a if segs_a and segs_a[0].get('start') is not None else segs_b
+        if base and base[0].get('start') is not None:
+            return [{'start': base[0]['start'], 'end': base[-1].get('end'), 'text': merged}]
+        return [{'start': None, 'end': None, 'text': merged}]
+    except Exception:
+        return segs_a
+
+
+async def transcribe_audio_dual(audio_path: str, language: str = 'fa',
+                                context_hint: str = '',
+                                on_progress=None) -> list:
+    """Run top-2 ASR models in parallel per chunk, LLM-merge results."""
+    import shutil, asyncio
+    order = _asr_order()
+    if len(order) < 2:
+        return await transcribe_audio(audio_path, language, context_hint, on_progress)
+
+    model_a, model_b = order[0], order[1]
+    chunks = _split_audio_chunks(audio_path, max_mb=19.0, overlap_sec=3.0)
+    is_split = len(chunks) > 1 or chunks[0][0] != audio_path
+    n = len(chunks)
+    sem = asyncio.Semaphore(3)
+    done_count = [0]
+
+    async def _do_chunk(idx: int, chunk_path: str, nom_start: float):
+        async with sem:
+            with open(chunk_path, 'rb') as f:
+                data = f.read()
+            pair = await asyncio.gather(
+                _transcribe_bytes_single(data, language, model_a, context_hint),
+                _transcribe_bytes_single(data, language, model_b, context_hint),
+                return_exceptions=True,
+            )
+            sa = pair[0] if not isinstance(pair[0], BaseException) else []
+            sb = pair[1] if not isinstance(pair[1], BaseException) else []
+            merged = await _merge_dual_transcripts(sa, sb, model_a, model_b)
+            _last_model['name'] = model_a
+            done_count[0] += 1
+            if on_progress:
+                try:
+                    on_progress(done_count[0], n)
+                except Exception:
+                    pass
+            return (idx, merged, nom_start)
+
+    raw = await asyncio.gather(
+        *[_do_chunk(i, cp, ns) for i, (cp, ns, _) in enumerate(chunks)],
+        return_exceptions=True,
+    )
+    results = sorted(
+        [r for r in raw if not isinstance(r, BaseException)],
+        key=lambda x: x[0],
+    )
+    try:
+        return _assemble_chunks(results)
+    finally:
+        if is_split:
+            tmpdir = os.path.dirname(chunks[0][0])
+            try:
+                shutil.rmtree(tmpdir, ignore_errors=True)
+            except Exception:
+                pass
 
 
 # ── LLM pipeline steps ─────────────────────────────────────────────────────────
@@ -309,19 +452,21 @@ async def correct_transcript_segments(segments: list, title: str = '', language:
     if not segments:
         return segments
 
+    custom_instr = _load_prompts().get('correct', '')
+    instr = custom_instr or (
+        "You are correcting ASR (automatic speech recognition) errors in a transcript.\n"
+        f"Content language: {language}. Fix homophones, run-together words, misheard terms.\n"
+        f"Content: {title or 'general media'}\n\n"
+        "Return ONLY a JSON array of corrected strings, same count as input, same order.\n"
+        "Fix only clear errors. If uncertain, keep original. No explanations."
+    )
+
     BATCH = 120
     corrected = list(segments)
     for batch_start in range(0, len(segments), BATCH):
         batch = segments[batch_start: batch_start + BATCH]
         lines = [f"{i+1}. {s['text']}" for i, s in enumerate(batch)]
-        prompt = (
-            "You are correcting ASR (automatic speech recognition) errors in a transcript.\n"
-            f"Content language: {language}. Fix homophones, run-together words, misheard terms.\n"
-            f"Content: {title or 'general media'}\n\n"
-            "Return ONLY a JSON array of corrected strings, same count as input, same order.\n"
-            "Fix only clear errors. If uncertain, keep original. No explanations.\n\n"
-            f"Segments:\n{chr(10).join(lines)}"
-        )
+        prompt = f"{instr}\n\nSegments:\n{chr(10).join(lines)}"
         try:
             raw = await chat([{"role": "user", "content": prompt}], temperature=0.1, max_tokens=4096)
             fixes = _parse_json(raw)
@@ -352,18 +497,23 @@ async def generate_book_paragraphs(segments: list, title: str = '') -> list:
     if cur:
         chunks.append(cur)
 
+    custom_para_instr = _load_prompts().get('paragraphs', '')
+    para_instr = custom_para_instr or (
+        "متن زیر رونویسی خام یک محتوای رسانه‌ای است که توسط سیستم ASR تهیه شده.\n"
+        "این متن را به یک بخش کتاب تبدیل کن:\n"
+        "۱. یک عنوان معنادار فارسی (۲ تا ۵ کلمه) برای این بخش بساز\n"
+        "۲. متن را به نثر روان و خوانا تبدیل کن\n"
+        "۳. پاراگراف‌بندی طبیعی با خط خالی بین پاراگراف‌ها\n"
+        "۴. همه محتوا را حفظ کن — فقط پاکسازی، نه حذف"
+    )
+
     result = []
     for chunk in chunks:
         start_sec = chunk[0].get('start')
         end_sec = chunk[-1].get('end')
         raw_text = ' '.join(s.get('text', '').strip() for s in chunk)
         prompt = (
-            "متن زیر رونویسی خام یک محتوای رسانه‌ای است که توسط سیستم ASR تهیه شده.\n"
-            "این متن را به یک بخش کتاب تبدیل کن:\n"
-            "۱. یک عنوان معنادار فارسی (۲ تا ۵ کلمه) برای این بخش بساز\n"
-            "۲. متن را به نثر روان و خوانا تبدیل کن\n"
-            "۳. پاراگراف‌بندی طبیعی با خط خالی بین پاراگراف‌ها\n"
-            "۴. همه محتوا را حفظ کن — فقط پاکسازی، نه حذف\n\n"
+            f"{para_instr}\n\n"
             'فقط JSON برگردان: {"title_fa": "عنوان بخش", "text_fa": "متن پاک‌شده"}\n\n'
             f"عنوان محتوا: {title or 'محتوای رسانه‌ای'}\n"
             f"متن خام:\n{raw_text}"
@@ -386,16 +536,24 @@ async def generate_book_paragraphs(segments: list, title: str = '') -> list:
 
 
 async def summarize_fa(text: str, title: str = '') -> dict:
-    """Returns {summary_fa, infographic_fa}"""
+    """Returns {summary_fa, main_theme}"""
+    custom_instr = _load_prompts().get('summary', '')
+    instr = custom_instr or (
+        "متن رونویسی این محتوا را برایم خلاصه کن.\n"
+        "یک خلاصه روایی نیم‌صفحه‌ای به فارسی روان بنویس — انگار دوستت برایت تعریف می‌کند چه چیزی در این ویدیو/صدا بود.\n"
+        "نه عنوان، نه لیست، نه بولت‌پوینت — فقط چند پاراگراف پیوسته که بگوید چه موضوعاتی مطرح شد، "
+        "چه نکات مهمی گفته شد، و پیام اصلی محتوا چیست.\n"
+        "حداقل ۱۵۰ کلمه و حداکثر ۳۰۰ کلمه."
+    )
     prompt = (
-        "یک محتوای رسانه‌ای تحلیل کن و خلاصه‌ای جامع به فارسی ارائه بده.\n"
+        f"{instr}\n\n"
         f"عنوان: {title or 'بدون عنوان'}\n\n"
-        "JSON برگردان با این کلیدها:\n"
+        'JSON برگردان:\n'
         '{\n'
-        '  "summary_fa": "خلاصه ۳ تا ۵ جمله‌ای به فارسی",\n'
+        '  "summary_fa": "خلاصه روایی نیم‌صفحه‌ای",\n'
         '  "main_theme": "موضوع اصلی به فارسی (یک جمله)"\n'
         '}\n\n'
-        f"متن (۴۰۰۰ کاراکتر اول):\n{text[:4000]}"
+        f"متن:\n{text[:5000]}"
     )
     raw = await chat([{"role": "user", "content": prompt}], temperature=0.4, json_mode=True)
     try:
