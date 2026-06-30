@@ -991,11 +991,21 @@ async function openPlayer(id, autoplay = false) {
   }
 }
 
+function _ytVideoId(item) {
+  if (item.external_id) return item.external_id;
+  try {
+    const u = new URL(item.url_source || '');
+    return u.searchParams.get('v') || u.pathname.split('/').pop() || null;
+  } catch { return null; }
+}
+
 async function _initPlayerForItem(item, autoplay) {
   const src = item.source;
   if (src === 'youtube') {
+    const vid = _ytVideoId(item);
+    if (!vid) { document.getElementById('pl-video').innerHTML = '<div class="msg">شناسه ویدیو یافت نشد</div>'; return; }
     _loadYtAPI();
-    Player.initYouTube(item.external_id, autoplay);
+    Player.initYouTube(vid, autoplay);
   } else if (src === 'upload') {
     const fileUrl = `/api/items/${item.id}/file`;
     if (item.type === 'video') {
@@ -1416,11 +1426,18 @@ function saveSearchHist(q) {
 
 function showSearchHist() {
   const el = document.getElementById('s-hist');
-  el.innerHTML = ST.searchHist.map(q =>
-    `<button class="tag-chip" onclick="document.getElementById('s-in').value='${esc(q)}';doSearch()">
-      ${esc(q)} <span onclick="event.stopPropagation();removeSearchHist('${esc(q)}')">✕</span>
-    </button>`
-  ).join('');
+  el.innerHTML = '';
+  ST.searchHist.forEach((q, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'tag-chip';
+    btn.onclick = () => { document.getElementById('s-in').value = q; doSearch(); };
+    const rm = document.createElement('span');
+    rm.textContent = ' ✕';
+    rm.onclick = e => { e.stopPropagation(); removeSearchHist(q); };
+    btn.appendChild(document.createTextNode(q));
+    btn.appendChild(rm);
+    el.appendChild(btn);
+  });
 }
 
 function removeSearchHist(q) {
