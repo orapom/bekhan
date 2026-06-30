@@ -274,6 +274,9 @@ mark{background:rgba(126,184,247,.25);color:var(--gold);border-radius:.15em}
 .mp-btns{display:flex;align-items:center;gap:.45rem;flex-shrink:0}
 .mp-btn{background:none;border:none;color:var(--mu);font-size:.95rem;font-family:var(--ff-ui);padding:.18rem;cursor:pointer}
 .mp-btn:hover{color:var(--gold)}
+.btn-dl{display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .75rem;border-radius:var(--r);background:var(--surf);border:1px solid var(--line);color:var(--mu);font-size:.75rem;font-family:var(--ff-ui);text-decoration:none;transition:var(--tr)}
+.btn-dl:hover{border-color:var(--gold);color:var(--gold)}
+.dl-row{margin-top:.35rem}
 .msg{text-align:center;color:var(--mu);padding:3rem 1rem;font-size:.88rem}
 .ldots::after{content:'...';animation:ld 1.4s infinite}
 @keyframes ld{0%{content:''}30%{content:'.'}60%{content:'..'}100%{content:'...'}}
@@ -1013,7 +1016,7 @@ function _drawWaveform(t, dur) {
   for (let i = 0; i < N; i++) {
     const h = Math.max(4, (_wvBars[i] || 0.2) * H * 0.85);
     const x = (W - 1 - (i * (W/N)));
-    ctx.fillStyle = x <= playX ? mu2 : gold;
+    ctx.fillStyle = x >= playX ? mu2 : gold;
     ctx.fillRect(x, (H-h)/2, Math.max(1, bw), h);
   }
   ctx.fillStyle = gold;
@@ -1338,6 +1341,7 @@ async function setTrLang(lang) {
       ST.speakersMap = {};
       ST.isMultiSpeaker = false;
     }
+    _buildWvBars();
     renderTranscript();
     return;
   }
@@ -1345,11 +1349,16 @@ async function setTrLang(lang) {
   try {
     const data = await fetch(`/api/items/${id}/transcript?lang=${lang}`).then(r => r.json());
     const segs = data.segments || [];
+    if (lang === 'en' && !segs.length) {
+      document.getElementById('tr-wrap').innerHTML = '<div class="msg">ترجمه‌ای موجود نیست — ترجمه خودکار را از تنظیمات مدل فعال کنید</div>';
+      return;
+    }
     ST.trCache[cacheKey] = segs;
     ST.trSegs = segs;
     ST.speakersMap = {};
     if (lang === 'fa') segs.forEach(s => { if (s.speaker) ST.speakersMap[s.seg_index ?? 0] = s.speaker; });
     else { ST.isMultiSpeaker = false; }
+    _buildWvBars();
     renderTranscript();
   } catch {
     document.getElementById('tr-wrap').innerHTML = lang === 'en'
@@ -1582,13 +1591,18 @@ async function doSearch() {
     return hay.includes(q.toLowerCase());
   });
 
-  // Also search transcripts in cache
+  // Also expand results with transcript cache hits (items where title didn't match but transcript does)
   if (q) {
-    results = results.filter(it => {
-      if (results.includes(it)) return true;
+    const lq = q.toLowerCase();
+    const resultIds = new Set(results.map(it => it.id));
+    const extra = Object.values(ST.map).filter(it => {
+      if (resultIds.has(it.id)) return false;
+      if (src && it.source !== src) return false;
+      if (st && it.status !== st) return false;
       const segs = ST.trCache[it.id + '_fa'] || [];
-      return segs.some(s => (s.text||'').toLowerCase().includes(q.toLowerCase()));
+      return segs.some(s => (s.text||'').toLowerCase().includes(lq));
     });
+    if (extra.length) results = [...results, ...extra];
   }
 
   document.getElementById('s-count').textContent = `${results.length} نتیجه`;

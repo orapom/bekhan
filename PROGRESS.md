@@ -198,14 +198,50 @@ Neither GPT-4o-Transcribe nor Whisper-1 returns speaker labels. LLM post-process
 
 ---
 
+## ✅ Done (session 4 — bug fixes + testing)
+
+### Bug Fixes
+- [x] Container not rebuilt → all session 3 features missing (speakers, translate, diarize) — **rebuilt**
+- [x] `translate_item` misplaced at END of pipeline chain in api.py — **moved after correct_transcript**
+- [x] `doSearch()` transcript expansion no-op (`results.includes(it)` always true) — **fixed, now adds transcript-matched items**
+- [x] Missing `.btn-dl` + `.dl-row` CSS for download button — **added**
+- [x] Waveform RTL color direction reversed (played vs unplayed bars) — **fixed** (`x >= playX`)
+- [x] `_buildWvBars()` not called after `setTrLang()` switch — **fixed**
+- [x] EN empty-segments shows generic "no transcript" message — **fixed: shows "enable translate" hint**
+- [x] `correct_transcript` re-ran on every reprocess (~30 min for 41-min video) — **fixed: skip-if-already-done check**
+
+### New Endpoints
+- [x] `GET /api/items/{id}/speakers` — speaker diarization result `{is_multi_speaker, names}`
+
+---
+
 ## 🔴 Not Done / Pending
 
-### Search — Semantic
-- Current: SQLite `LIKE` fulltext
-- Planned: embedding-based vector search
+### Search — Semantic / Backend
+- Current: client-side filter + transcript cache; no `/api/search` backend endpoint
+- Planned: SQLite FTS or embedding-based vector search
+
+### Aparat Quality Selection
+- yt-dlp fetches best quality by default; no UI to choose quality level
+
+### Book mode karaoke sync
+- Book mode does chapter-level sync only; segment-level karaoke within book mode not implemented
+
+### Benchmark / Model Comparison Page
+- User-requested: dedicated page to compare models on speed and quality
+- Need: standard test audio/text, run multiple models, compare output
+
+### Database Backup
+- No git/S3 backup for `data/` volume
 
 ### Aparat Subtitles
 - yt-dlp fetches if available; no manual subtitle upload UI
+
+### YouTube (deferred)
+- SSL/network blocked in Docker container; user will fix VPN
+
+### Chrome Extension (deferred)
+- Planned: browser extension that POSTs URL to `/api/import`
 
 ---
 
@@ -215,8 +251,8 @@ Neither GPT-4o-Transcribe nor Whisper-1 returns speaker labels. LLM post-process
 |-------|--------|
 | YouTube network blocked in container | Deferred — user will fix VPN |
 | `file_path` set to audio even for uploaded video files | Minor — doesn't break playback |
-| Artwork task silently sets status=done even if artwork fails | Acceptable — final step |
-| No retry UI for individual pipeline steps (only full retranscribe) | Future |
+| Artwork task marks done even if artwork fails | Acceptable — final step |
+| No retry UI for individual pipeline steps | Future |
 | Flower dashboard has no auth | Local-only, port 5556 |
 
 ---
@@ -235,7 +271,7 @@ bekhan/
 │   ├── media_import.py     # yt-dlp wrappers, subtitle parsing, detect_source()
 │   └── requirements.txt
 ├── frontend/
-│   └── index.html          # Single-file SPA, ~1900 lines, RTL Persian
+│   └── index.html          # Single-file SPA, ~2350 lines, RTL Persian
 ├── data/                   # Volume: bekhan.db, media/, audio/, model_config.json
 ├── docker-compose.yml      # redis + api + worker + flower
 ├── Makefile                # make up / make logs / make shell / make rebuild
@@ -319,3 +355,21 @@ summary should be really summaty not an intro. like a half pager like someone is
 
 
 prompts shpuld be configurable in admin panel too
+
+
+a comperhensive benchmark page is needed 
+
+
+aparat videos are low quality while aparat has seceral qualities and you should use max quality and i should be able to choose between differnet qualities
+
+the part کتابچه should be kareoky too, current word highkughted and synced.
+
+
+it seems models are not working as i expected. for each task, i want you to create a default input text or sound, long enough, compare different models with different params and put this benchmark in a specific page to see how are models actually working and compare quality and speed
+
+
+
+database should be backedup in git or s3
+
+
+

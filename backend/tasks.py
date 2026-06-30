@@ -265,6 +265,17 @@ def correct_transcript(self, item_id: str):
     if not segs_raw:
         return item_id
 
+    # Skip if already corrected (check pipeline_state)
+    conn_chk = db.get_conn()
+    already_done = conn_chk.execute(
+        "SELECT 1 FROM pipeline_state WHERE item_id=? AND step='correct' AND status='done'",
+        (item_id,)
+    ).fetchone()
+    conn_chk.close()
+    if already_done:
+        _ps(item_id, 'correct', 'done')
+        return item_id
+
     seg_dicts = [{'start': r['start_sec'], 'end': r['end_sec'], 'text': r['text'],
                   'words': json.loads(r['words_json']) if r['words_json'] else None}
                  for r in segs_raw]

@@ -124,6 +124,7 @@ def import_item(body: dict, _: None = Depends(_check_secret)):
         import_url.si(item_id),
         transcribe_item.si(item_id),
         correct_transcript.si(item_id),
+        translate_item.si(item_id),
         diarize_item.si(item_id),
         generate_paragraphs.si(item_id),
         summarize_item.si(item_id),
@@ -132,7 +133,6 @@ def import_item(body: dict, _: None = Depends(_check_secret)):
         mark_sacred_segments_task.si(item_id),
         mark_external_quotes_task.si(item_id),
         generate_artwork_task.si(item_id),
-        translate_item.si(item_id),
     ).apply_async()
 
     return {'id': item_id, 'status': 'queued'}
@@ -188,6 +188,7 @@ async def upload_item(
         import_upload.si(item_id),
         transcribe_item.si(item_id),
         correct_transcript.si(item_id),
+        translate_item.si(item_id),
         diarize_item.si(item_id),
         generate_paragraphs.si(item_id),
         summarize_item.si(item_id),
@@ -196,7 +197,6 @@ async def upload_item(
         mark_sacred_segments_task.si(item_id),
         mark_external_quotes_task.si(item_id),
         generate_artwork_task.si(item_id),
-        translate_item.si(item_id),
     ).apply_async()
 
     return {'id': item_id, 'status': 'queued'}
@@ -217,6 +217,7 @@ def reprocess_item(item_id: str, _: None = Depends(_check_secret)):
     cchain(
         transcribe_item.si(item_id),
         correct_transcript.si(item_id),
+        translate_item.si(item_id),
         diarize_item.si(item_id),
         generate_paragraphs.si(item_id),
         summarize_item.si(item_id),
@@ -225,7 +226,6 @@ def reprocess_item(item_id: str, _: None = Depends(_check_secret)):
         mark_sacred_segments_task.si(item_id),
         mark_external_quotes_task.si(item_id),
         generate_artwork_task.si(item_id),
-        translate_item.si(item_id),
     ).apply_async()
     return {'ok': True}
 
