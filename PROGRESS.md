@@ -155,9 +155,11 @@ Single file, ~1900 lines, RTL, Persian, dark/light theme, no build step.
 
 ---
 
-## 🔴 Not Done / Pending
+---
 
-### ✅ Speaker Diarization (session 3 — done)
+## ✅ Done (session 3)
+
+### ✅ Speaker Diarization
 
 Neither GPT-4o-Transcribe nor Whisper-1 returns speaker labels. LLM post-processing step after `correct`.
 
@@ -187,10 +189,15 @@ Neither GPT-4o-Transcribe nor Whisper-1 returns speaker labels. LLM post-process
 - No bulk import from YouTube channel or Aparat profile
 - Would use yt-dlp `--flat-playlist` to enumerate, then queue each URL
 
-### Collections & Tags Management UI
-- Items can have `collections_json` and `tags_json`
-- No UI to create/edit collections or tags — only used as filters
-- Need: create collection, add item to collection, view collection page
+---
+
+## 🔴 Not Done / Pending
+
+### ✅ Collections & Tags Management UI (session 3 — done)
+- [x] Viewer: editable chips row — collections (green) + tags (blue); × to remove, input + Enter to add; ✎ toggle edit mode
+- [x] `PATCH /api/items/{id}` used for all changes (already existed)
+- [x] Admin: مجموعه‌ها and برچسب‌ها grids with per-item counts; click → filter library
+- [x] `STEP_NAMES` now includes `diarize → گویندگان`
 
 ### Search — Semantic / AI Q&A
 - Current search: SQLite `LIKE` fulltext on segments + titles

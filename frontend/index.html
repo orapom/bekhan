@@ -130,6 +130,22 @@ main#ct{padding:1.6rem;min-width:0}
 .tmbtn{padding:.2em .6em;border-radius:var(--r);font-size:.68rem;font-family:var(--ff-ui);background:none;border:1px solid transparent;color:var(--mu);cursor:pointer}
 .tmbtn.on{background:var(--surf);border-color:var(--line);color:var(--tx)}
 .tmbtn:hover{color:var(--gold)}
+/* Editable tags/collections */
+.chips-row{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center;min-height:1.4rem}
+.col-chip{font-size:.62rem;padding:.1em .5em;border-radius:2em;background:rgba(90,158,110,.14);color:var(--ok);font-family:var(--ff-ui);display:inline-flex;align-items:center;gap:.2rem}
+.col-chip.edit,.tag-chip.edit{cursor:default}
+.chip-rm{background:none;border:none;color:var(--mu);cursor:pointer;font-size:.7rem;padding:0 0 0 .15rem;line-height:1;font-family:var(--ff-ui)}
+.chip-rm:hover{color:var(--err)}
+.chip-add-in{background:none;border:none;border-bottom:1px solid var(--line);color:var(--tx);font-family:var(--ff-fa);font-size:.72rem;padding:.1rem .2rem;width:80px;outline:none;direction:rtl}
+.chip-add-in:focus{border-bottom-color:var(--gold)}
+.chip-add-lbl{font-size:.6rem;color:var(--mu);font-family:var(--ff-ui);padding:.1rem .2rem}
+.edit-toggle{background:none;border:none;font-size:.65rem;color:var(--mu);cursor:pointer;padding:.1rem .3rem;font-family:var(--ff-ui);border-radius:.2rem}
+.edit-toggle:hover{color:var(--gold)}
+/* Admin collections/tags grid */
+.ctag-grid{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.8rem}
+.ctag-item{display:inline-flex;align-items:center;gap:.3rem;font-size:.72rem;padding:.2em .6em;border-radius:2em;background:var(--card);border:1px solid var(--line);cursor:pointer;transition:var(--tr)}
+.ctag-item:hover{border-color:var(--gold);color:var(--gold)}
+.ctag-cnt{font-size:.6rem;font-family:var(--ff-mono);color:var(--mu)}
 .tr-wrap{max-height:460px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line) transparent;padding:0 .2rem}
 .bk-section{margin-bottom:1.6rem;padding-bottom:1.4rem;border-bottom:1px solid var(--line)}
 .bk-section:last-child{border-bottom:none}
@@ -329,7 +345,7 @@ mark{background:rgba(126,184,247,.25);color:var(--gold);border-radius:.15em}
               <div class="pl-hinfo">
                 <div class="p-title" id="pl-title"></div>
                 <div class="p-meta-row" id="pl-meta"></div>
-                <div id="pl-tags" class="c-tags"></div>
+                <div id="pl-chips"></div>
               </div>
             </div>
             <!-- audio controls (hidden for youtube) -->
@@ -451,6 +467,13 @@ mark{background:rgba(126,184,247,.25);color:var(--gold);border-radius:.15em}
         <button class="tmbtn" onclick="resetPromptConfig()" style="font-size:.7rem">پیش‌فرض</button>
       </div>
       <div id="prompt-cfg-wrap" style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem"></div>
+
+      <div class="sec-lbl" style="margin-top:1.4rem"><span class="sec-ic">🗂</span>مجموعه‌ها
+        <button class="tmbtn" onclick="nav('browse')" style="margin-right:auto;font-size:.7rem">مشاهده همه</button>
+      </div>
+      <div id="admin-colls" class="ctag-grid"></div>
+      <div class="sec-lbl" style="margin-top:.3rem"><span class="sec-ic">#</span>برچسب‌ها</div>
+      <div id="admin-tags" class="ctag-grid"></div>
 
       <div class="sec-lbl" style="margin-top:.4rem"><span class="sec-ic">≡</span>آیتم‌ها</div>
       <div style="overflow-x:auto">
@@ -1016,11 +1039,9 @@ async function openPlayer(id, autoplay = false) {
     `<span>${statusPill(item.status)}</span>`,
   ].join('');
 
-  // Tags
-  const tags = _parseTags(item.tags_json);
-  document.getElementById('pl-tags').innerHTML = tags.map(t =>
-    `<button class="tag-chip" onclick="filterByTag('${esc(t)}')">${esc(t)}</button>`
-  ).join('');
+  // Collections + tags editable chips
+  ST._tagsEdit = false;
+  _renderPlChips();
 
   // Breadcrumb
   const cols = _parseTags(item.collections_json);
@@ -1684,16 +1705,18 @@ async function loadQueue() {
 }
 
 // ── admin ─────────────────────────────────────────────────────────────────────
-const STEP_NAMES = {import:'دانلود',transcribe:'رونویسی',correct:'اصلاح',paragraphs:'فصل‌بندی',summarize:'خلاصه',mentions:'اشاره‌ها',infographic:'اینفوگرافیک',sacred:'متون مقدس',quotes:'نقل‌قول‌ها',artwork:'آرت‌ورک'};
+const STEP_NAMES = {import:'دانلود',transcribe:'رونویسی',correct:'اصلاح',diarize:'گویندگان',paragraphs:'فصل‌بندی',summarize:'خلاصه',mentions:'اشاره‌ها',infographic:'اینفوگرافیک',sacred:'متون مقدس',quotes:'نقل‌قول‌ها',artwork:'آرت‌ورک'};
 
 async function loadAdmin() {
-  const [stats, pipeStats, workers, itemsResp, modelCfg, promptCfg] = await Promise.all([
+  const [stats, pipeStats, workers, itemsResp, modelCfg, promptCfg, collsResp, tagsResp] = await Promise.all([
     fetch('/api/stats').then(r => r.json()),
     fetch('/api/admin/pipeline-stats').then(r => r.json()),
     fetch('/api/admin/workers').then(r => r.json()),
-    fetch('/api/items?limit=50').then(r => r.json()),
+    fetch('/api/items?limit=200').then(r => r.json()),
     fetch('/api/admin/model-config').then(r => r.json()),
     fetch('/api/admin/prompt-config').then(r => r.json()).catch(() => ({prompts:{},defaults:{}})),
+    fetch('/api/collections').then(r => r.json()).catch(() => ({collections:[]})),
+    fetch('/api/tags').then(r => r.json()).catch(() => ({tags:[]})),
   ]);
 
   // Worker indicator
@@ -1750,6 +1773,38 @@ async function loadAdmin() {
   // Prompt config editor
   ST._promptCfg = promptCfg;
   renderPromptConfig(promptCfg);
+
+  // Collections overview
+  const collNames = collsResp.collections || [];
+  const collCountMap = {};
+  (itemsResp.items||[]).forEach(it => {
+    try { JSON.parse(it.collections_json||'[]').forEach(c => { collCountMap[c] = (collCountMap[c]||0)+1; }); } catch {}
+  });
+  const collsEl = document.getElementById('admin-colls');
+  if (collNames.length) {
+    collsEl.innerHTML = collNames.map(c =>
+      `<button class="ctag-item" onclick="filterByCollection('${esc(c)}');nav('browse')">
+        ${esc(c)}<span class="ctag-cnt">${collCountMap[c]||0}</span></button>`
+    ).join('');
+  } else {
+    collsEl.innerHTML = '<span style="font-size:.78rem;color:var(--mu)">مجموعه‌ای ثبت نشده</span>';
+  }
+
+  // Tags overview
+  const tagNames = tagsResp.tags || [];
+  const tagCountMap = {};
+  (itemsResp.items||[]).forEach(it => {
+    try { JSON.parse(it.tags_json||'[]').forEach(t => { tagCountMap[t] = (tagCountMap[t]||0)+1; }); } catch {}
+  });
+  const tagsEl = document.getElementById('admin-tags');
+  if (tagNames.length) {
+    tagsEl.innerHTML = tagNames.map(t =>
+      `<button class="ctag-item" onclick="filterByTag('${esc(t)}');nav('browse')">
+        #${esc(t)}<span class="ctag-cnt">${tagCountMap[t]||0}</span></button>`
+    ).join('');
+  } else {
+    tagsEl.innerHTML = '<span style="font-size:.78rem;color:var(--mu)">برچسبی ثبت نشده</span>';
+  }
 
   // Items table with per-step detail on expand
   const tbody = document.getElementById('admin-tbody');
@@ -1989,6 +2044,93 @@ function statusPill(st) {
 
 function _parseTags(json) {
   try { const v = JSON.parse(json||'[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+
+// ── collections & tags management ─────────────────────────────────────────────
+
+function _renderPlChips() {
+  const el = document.getElementById('pl-chips');
+  if (!el || !ST.item) return;
+  const cols = _parseTags(ST.item.collections_json);
+  const tags = _parseTags(ST.item.tags_json);
+  const edit = ST._tagsEdit;
+
+  let html = '<div class="chips-row" style="margin-top:.4rem">';
+  cols.forEach(c => {
+    html += `<span class="col-chip${edit?' edit':''}">${esc(c)}`;
+    if (edit) html += `<button class="chip-rm" onclick="_removeCollection('${esc(c)}')">×</button>`;
+    html += '</span>';
+  });
+  tags.forEach(t => {
+    html += `<button class="tag-chip${edit?' edit':''}" ${edit?'':'onclick="filterByTag(\''+esc(t)+'\')"'}>${esc(t)}`;
+    if (edit) html += `<button class="chip-rm" onclick="_removeTag('${esc(t)}')">×</button>`;
+    html += '</button>';
+  });
+  if (!cols.length && !tags.length && !edit) {
+    html += `<span style="font-size:.65rem;color:var(--mu)"></span>`;
+  }
+  if (edit) {
+    html += `<span class="chip-add-lbl">+مجموعه:</span>
+      <input class="chip-add-in" id="chip-col-in" placeholder="نام مجموعه"
+        onkeydown="if(event.key==='Enter')_addCollection(this.value)">
+      <span class="chip-add-lbl">+برچسب:</span>
+      <input class="chip-add-in" id="chip-tag-in" placeholder="برچسب"
+        onkeydown="if(event.key==='Enter')_addTag(this.value)">`;
+  }
+  html += `<button class="edit-toggle" onclick="ST._tagsEdit=!ST._tagsEdit;_renderPlChips()">${edit?'✓ بستن':'✎'}</button>`;
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+async function _patchItemMeta(data) {
+  if (!ST.id) return;
+  try {
+    await fetch(`/api/items/${ST.id}`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(data),
+    });
+  } catch(e) { console.warn('patch item failed', e); }
+}
+
+function _addCollection(name) {
+  name = (name||'').trim();
+  if (!name) return;
+  const cols = _parseTags(ST.item.collections_json);
+  if (cols.includes(name)) return;
+  cols.push(name);
+  ST.item.collections_json = JSON.stringify(cols);
+  _patchItemMeta({collections: cols});
+  _renderPlChips();
+  const el = document.getElementById('chip-col-in');
+  if (el) el.value = '';
+}
+
+function _removeCollection(name) {
+  const cols = _parseTags(ST.item.collections_json).filter(c => c !== name);
+  ST.item.collections_json = JSON.stringify(cols);
+  _patchItemMeta({collections: cols});
+  _renderPlChips();
+}
+
+function _addTag(name) {
+  name = (name||'').trim();
+  if (!name) return;
+  const tags = _parseTags(ST.item.tags_json);
+  if (tags.includes(name)) return;
+  tags.push(name);
+  ST.item.tags_json = JSON.stringify(tags);
+  _patchItemMeta({tags: tags});
+  _renderPlChips();
+  const el = document.getElementById('chip-tag-in');
+  if (el) el.value = '';
+}
+
+function _removeTag(name) {
+  const tags = _parseTags(ST.item.tags_json).filter(t => t !== name);
+  ST.item.tags_json = JSON.stringify(tags);
+  _patchItemMeta({tags: tags});
+  _renderPlChips();
 }
 
 // ── init ──────────────────────────────────────────────────────────────────────
