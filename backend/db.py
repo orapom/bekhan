@@ -384,7 +384,7 @@ def get_all_tags() -> list[str]:
 def get_pipeline_stats() -> dict:
     conn = get_conn()
     try:
-        steps = ['import', 'transcribe', 'correct', 'paragraphs', 'summarize',
+        steps = ['import', 'transcribe', 'correct', 'diarize', 'paragraphs', 'summarize',
                  'mentions', 'infographic', 'sacred', 'quotes', 'artwork']
         total = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
         done = conn.execute("SELECT COUNT(*) FROM items WHERE status='done'").fetchone()[0]

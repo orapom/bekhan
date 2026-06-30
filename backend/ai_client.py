@@ -626,6 +626,58 @@ async def mark_sacred_segments(segments: list) -> list:
         return []
 
 
+async def diarize_speakers(segments: list, title: str = '') -> dict:
+    """
+    LLM speaker diarization. Returns:
+    {is_multi_speaker, assignments: [{seg_index, speaker}], names: {A: ..., B: ...}}
+    """
+    if not segments:
+        return {'is_multi_speaker': False, 'assignments': [], 'names': {}}
+
+    BATCH = 80
+    all_assignments: list = []
+    is_multi = False
+    names: dict = {}
+
+    for batch_start in range(0, len(segments), BATCH):
+        batch = segments[batch_start: batch_start + BATCH]
+        items = [{'i': s.get('seg_index', batch_start + j), 't': (s.get('text') or '').strip()}
+                 for j, s in enumerate(batch)]
+        first_batch = batch_start == 0
+        prompt = (
+            f"عنوان محتوا: {title or 'رسانه'}\n\n"
+            "بخش‌های رونویسی زیر را تحلیل کن و مشخص کن هر بخش توسط کدام گوینده گفته شده.\n"
+            "گوینده‌ها را با حرف A، B، C یا D نام‌گذاری کن.\n"
+            "اگر فقط یک گوینده وجود دارد، is_multi_speaker را false کن.\n"
+            "اگر اسم یا نقش گویندگان مشخص است، در names بنویس (مثلاً مجری، میهمان، استاد).\n\n"
+            "JSON برگردان:\n"
+            '{\n'
+            '  "is_multi_speaker": true/false,\n'
+            '  "assignments": [{"i": <seg_index>, "sp": "A"|"B"|"C"|"D"}, ...],\n'
+            '  "names": {"A": "نام یا نقش گوینده A", "B": "..."}\n'
+            '}\n\n'
+            f"بخش‌ها:\n{json.dumps(items, ensure_ascii=False)}"
+        )
+        try:
+            raw = await chat([{"role": "user", "content": prompt}],
+                             temperature=0.1, max_tokens=4096, json_mode=True)
+            data = _parse_json(raw)
+            if first_batch:
+                is_multi = bool(data.get('is_multi_speaker', False))
+            if not is_multi:
+                break
+            for a in (data.get('assignments') or []):
+                sp = a.get('sp', 'A')
+                if sp and a.get('i') is not None:
+                    all_assignments.append({'seg_index': int(a['i']), 'speaker': str(sp)})
+            if data.get('names'):
+                names.update(data['names'])
+        except Exception as exc:
+            log.warning("diarize_speakers batch %d: %s", batch_start, exc)
+
+    return {'is_multi_speaker': is_multi, 'assignments': all_assignments, 'names': names}
+
+
 async def mark_external_quotes(segments: list) -> list:
     """Return seg_index list for segments where speaker quotes external sources (orange)."""
     items = [{'i': s.get('seg_index', i), 't': (s.get('text') or '').strip()}

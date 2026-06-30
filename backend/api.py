@@ -116,7 +116,7 @@ def import_item(body: dict, _: None = Depends(_check_secret)):
     })
 
     from celery import chain as cchain
-    from tasks import import_url, transcribe_item, correct_transcript, generate_paragraphs
+    from tasks import import_url, transcribe_item, correct_transcript, diarize_item, generate_paragraphs
     from tasks import summarize_item, extract_mentions_task, generate_infographic_task
     from tasks import mark_sacred_segments_task, mark_external_quotes_task, generate_artwork_task
 
@@ -124,6 +124,7 @@ def import_item(body: dict, _: None = Depends(_check_secret)):
         import_url.si(item_id),
         transcribe_item.si(item_id),
         correct_transcript.si(item_id),
+        diarize_item.si(item_id),
         generate_paragraphs.si(item_id),
         summarize_item.si(item_id),
         extract_mentions_task.si(item_id),
@@ -178,7 +179,7 @@ async def upload_item(
     })
 
     from celery import chain as cchain
-    from tasks import import_upload, transcribe_item, correct_transcript, generate_paragraphs
+    from tasks import import_upload, transcribe_item, correct_transcript, diarize_item, generate_paragraphs
     from tasks import summarize_item, extract_mentions_task, generate_infographic_task
     from tasks import mark_sacred_segments_task, mark_external_quotes_task, generate_artwork_task
 
@@ -186,6 +187,7 @@ async def upload_item(
         import_upload.si(item_id),
         transcribe_item.si(item_id),
         correct_transcript.si(item_id),
+        diarize_item.si(item_id),
         generate_paragraphs.si(item_id),
         summarize_item.si(item_id),
         extract_mentions_task.si(item_id),
@@ -205,7 +207,7 @@ def reprocess_item(item_id: str, _: None = Depends(_check_secret)):
         raise HTTPException(404, 'not found')
 
     from celery import chain as cchain
-    from tasks import transcribe_item, correct_transcript, generate_paragraphs
+    from tasks import transcribe_item, correct_transcript, diarize_item, generate_paragraphs
     from tasks import summarize_item, extract_mentions_task, generate_infographic_task
     from tasks import mark_sacred_segments_task, mark_external_quotes_task, generate_artwork_task
 
@@ -213,6 +215,7 @@ def reprocess_item(item_id: str, _: None = Depends(_check_secret)):
     cchain(
         transcribe_item.si(item_id),
         correct_transcript.si(item_id),
+        diarize_item.si(item_id),
         generate_paragraphs.si(item_id),
         summarize_item.si(item_id),
         extract_mentions_task.si(item_id),
@@ -273,7 +276,7 @@ def get_transcript(item_id: str, lang: str = 'fa'):
     conn = db.get_conn()
     try:
         rows = conn.execute(
-            "SELECT seg_index, start_sec, end_sec, text, words_json "
+            "SELECT seg_index, start_sec, end_sec, text, words_json, speaker "
             "FROM transcript_segments WHERE item_id=? AND language=? ORDER BY seg_index",
             (item_id, lang)
         ).fetchall()
@@ -282,10 +285,29 @@ def get_transcript(item_id: str, lang: str = 'fa'):
             'start': r['start_sec'],
             'end': r['end_sec'],
             'text': r['text'],
+            'speaker': r['speaker'],
         } for r in rows]
         return {'segments': segments, 'language': lang}
     finally:
         conn.close()
+
+
+@app.get('/api/items/{item_id}/speakers')
+def get_speakers(item_id: str):
+    conn = db.get_conn()
+    try:
+        row = conn.execute(
+            "SELECT content FROM ai_content WHERE item_id=? AND content_type='speakers' AND language='fa'",
+            (item_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row or not row['content']:
+        return {'is_multi_speaker': False, 'names': {}}
+    try:
+        return json.loads(row['content'])
+    except Exception:
+        return {'is_multi_speaker': False, 'names': {}}
 
 
 @app.get('/api/items/{item_id}/transcript.srt')

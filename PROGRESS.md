@@ -157,15 +157,15 @@ Single file, ~1900 lines, RTL, Persian, dark/light theme, no build step.
 
 ## 🔴 Not Done / Pending
 
-### Speaker Diarization (next priority)
+### ✅ Speaker Diarization (session 3 — done)
 
-Neither GPT-4o-Transcribe nor Whisper-1 returns speaker labels. Plan: LLM post-processing step after `correct`.
+Neither GPT-4o-Transcribe nor Whisper-1 returns speaker labels. LLM post-processing step after `correct`.
 
-- [x] DB column `speaker TEXT` already in `transcript_segments` migration
-- [ ] `ai_client.py`: `diarize_speakers(segments, title)` — sends batches to LLM, returns speaker assignments
-- [ ] `tasks.py`: `diarize_item` task after `correct_transcript`, before `generate_paragraphs`
-- [ ] `api.py`: transcript endpoint returns `speaker` field; add `/speakers` endpoint
-- [ ] Frontend: speaker chips in karaoke, speaker legend, color per speaker (A=gold, B=teal, C=orange)
+- [x] DB column `speaker TEXT` in `transcript_segments` (migration from session 2)
+- [x] `ai_client.py`: `diarize_speakers(segments, title)` — batches of 80 segs to LLM, returns `{is_multi_speaker, assignments, names}`
+- [x] `tasks.py`: `diarize_item` task after `correct_transcript`, before `generate_paragraphs`; saves speaker assignments to DB + `speakers` ai_content
+- [x] `api.py`: transcript endpoint returns `speaker` field; `GET /api/items/{id}/speakers` endpoint; `diarize_item` in all 3 pipeline chains; `diarize` in pipeline stats
+- [x] Frontend: speaker chips (A=blue/gold, B=teal, C=orange, D=purple); speaker legend at top of karaoke when multi-speaker; chip shows only on speaker change
 
 ### YouTube Network Block
 - YouTube SSL `UNEXPECTED_EOF_WHILE_READING` from Docker container — likely network/VPN issue on this machine

@@ -148,6 +148,13 @@ main#ct{padding:1.6rem;min-width:0}
 .kw:hover{color:var(--gold)}
 .sacred{color:#5a9e6e;font-weight:500;font-style:italic}
 .ext-quote{color:#c87c2a;font-weight:500;font-style:italic}
+.sp-chip{display:inline-block;font-size:.56rem;font-family:var(--ff-ui);font-weight:700;padding:.08em .38em;border-radius:2em;margin-left:.35rem;vertical-align:middle;letter-spacing:.04em;flex-shrink:0}
+.sp-a{background:rgba(126,184,247,.22);color:#7eb8f7}[data-theme=light] .sp-a{background:rgba(37,99,235,.14);color:#2563eb}
+.sp-b{background:rgba(77,182,172,.2);color:#4db6ac}
+.sp-c{background:rgba(240,144,66,.2);color:#f09042}
+.sp-d{background:rgba(171,71,188,.2);color:#ab47bc}
+.sp-legend{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.6rem;padding:.4rem .5rem;background:var(--surf);border-radius:var(--r);border:1px solid var(--line)}
+.sp-leg-item{display:flex;align-items:center;gap:.3rem;font-size:.72rem;color:var(--mu)}
 .sum-block{margin-bottom:.9rem}
 .sum-ll{font-size:.62rem;font-family:var(--ff-ui);font-weight:700;color:var(--gold);letter-spacing:.09em;text-transform:uppercase;margin-bottom:.3rem}
 .sum-tx{font-size:.88rem;line-height:1.82}
@@ -493,6 +500,9 @@ const ST = {
   paragraphs: [],    // book paragraphs
   sacredSet: new Set(),
   quotesSet: new Set(),
+  speakersMap: {},    // seg_index → speaker label (A/B/C/D)
+  speakerNames: {},   // A → name/role
+  isMultiSpeaker: false,
   map: {},           // id→item cache from browse
   trCache: {},       // id→segments cache
   artCache: {},      // id→artwork URL cache
@@ -986,6 +996,9 @@ function _bookSync(t) {
 async function openPlayer(id, autoplay = false) {
   ST.id = id;
   ST.trSegs = [];
+  ST.speakersMap = {};
+  ST.speakerNames = {};
+  ST.isMultiSpeaker = false;
   _lastKaraokeIdx = -1;
   Player.destroy();
 
@@ -1106,6 +1119,9 @@ async function loadTranscript(id) {
     const segs = data.segments || [];
     ST.trSegs = segs;
     ST.trCache[id + '_fa'] = segs;
+    // Build speaker map from segment data
+    ST.speakersMap = {};
+    segs.forEach(s => { if (s.speaker) ST.speakersMap[s.seg_index ?? 0] = s.speaker; });
     _buildWvBars();
     renderTranscript();
   } catch {
@@ -1123,6 +1139,17 @@ async function loadAI(id) {
     ST.sacredSet = new Set((sacredData?.content || []).map(Number));
     const quotesData = ai['ext_quotes_fa'];
     ST.quotesSet = new Set((quotesData?.content || []).map(Number));
+
+    // Speaker diarization
+    const spData = ai['speakers_fa'];
+    if (spData?.content) {
+      const spd = typeof spData.content === 'string' ? JSON.parse(spData.content) : spData.content;
+      ST.isMultiSpeaker = spd.is_multi_speaker || false;
+      ST.speakerNames = spd.names || {};
+    } else {
+      ST.isMultiSpeaker = false;
+      ST.speakerNames = {};
+    }
 
     // Chapters from paragraphs
     const paras = ai['paragraphs_fa'];
@@ -1169,19 +1196,38 @@ function renderTranscript() {
   else renderBook(wrap);
 }
 
+const SP_COLORS = {A:'sp-a', B:'sp-b', C:'sp-c', D:'sp-d'};
+
 function renderKaraoke(wrap) {
   wrap.innerHTML = '';
+  // Speaker legend
+  if (ST.isMultiSpeaker && Object.keys(ST.speakerNames).length) {
+    const legend = document.createElement('div');
+    legend.className = 'sp-legend';
+    Object.entries(ST.speakerNames).forEach(([sp, name]) => {
+      const li = document.createElement('div');
+      li.className = 'sp-leg-item';
+      li.innerHTML = `<span class="sp-chip ${SP_COLORS[sp]||'sp-a'}">${esc(sp)}</span><span>${esc(name)}</span>`;
+      legend.appendChild(li);
+    });
+    wrap.appendChild(legend);
+  }
+  let lastSpeaker = null;
   ST.trSegs.forEach((s, i) => {
     const isSacred = ST.sacredSet.has(s.seg_index ?? i);
     const isQuote  = ST.quotesSet.has(s.seg_index ?? i);
+    const sp = ST.speakersMap[s.seg_index ?? i] || null;
     const para = document.createElement('div');
     para.className = 'para';
     para.id = 'kp-' + i;
     const ts = s.start != null ? fmtTime(s.start) : '';
     const cls = isSacred ? 'sacred' : isQuote ? 'ext-quote' : '';
+    const spHtml = (ST.isMultiSpeaker && sp && sp !== lastSpeaker)
+      ? `<span class="sp-chip ${SP_COLORS[sp]||'sp-a'}">${esc(sp)}</span>` : '';
+    if (sp) lastSpeaker = sp;
     para.innerHTML = `
       <span class="para-ts" onclick="Player.seek(${s.start||0})">${ts}</span>
-      <div class="para-body${cls?' '+cls:''}">${esc(s.text||'')}</div>`;
+      <div class="para-body${cls?' '+cls:''}">${spHtml}${esc(s.text||'')}</div>`;
     para.onclick = () => Player.seek(s.start || 0);
     wrap.appendChild(para);
   });

@@ -59,6 +59,7 @@ def _pipeline_chain(item_id: str):
     return chain(
         transcribe_item.si(item_id),
         correct_transcript.si(item_id),
+        diarize_item.si(item_id),
         generate_paragraphs.si(item_id),
         summarize_item.si(item_id),
         extract_mentions_task.si(item_id),
@@ -286,6 +287,56 @@ def correct_transcript(self, item_id: str):
     except Exception as exc:
         _ps(item_id, 'correct', 'error', err=str(exc))
         log.error("correct_transcript %s: %s", item_id, exc)
+    return item_id
+
+
+# ── diarize ───────────────────────────────────────────────────────────────────
+
+@app.task(name='diarize_item', bind=True)
+def diarize_item(self, item_id: str):
+    from ai_client import diarize_speakers
+
+    conn = db.get_conn()
+    segs_raw = conn.execute(
+        "SELECT id, seg_index, start_sec, end_sec, text FROM transcript_segments "
+        "WHERE item_id=? AND language='fa' ORDER BY seg_index",
+        (item_id,)
+    ).fetchall()
+    conn.close()
+
+    if not segs_raw:
+        return item_id
+
+    item = db.get_item(item_id) or {}
+    seg_dicts = [{'seg_index': r['seg_index'], 'start': r['start_sec'],
+                  'end': r['end_sec'], 'text': r['text']}
+                 for r in segs_raw]
+
+    _ps(item_id, 'diarize', 'running')
+    try:
+        result = _run(diarize_speakers(
+            seg_dicts, title=item.get('title') or item.get('title_fa') or ''
+        ))
+        used: str = _m() or LLM_MODEL or ''
+        db.save_ai_content(item_id, 'speakers', 'fa',
+                           json.dumps({'is_multi_speaker': result['is_multi_speaker'],
+                                       'names': result.get('names', {})},
+                                      ensure_ascii=False), used)
+        if result['is_multi_speaker'] and result.get('assignments'):
+            assign_map = {a['seg_index']: a['speaker'] for a in result['assignments']}
+            conn2 = db.get_conn()
+            for row in segs_raw:
+                sp = assign_map.get(row['seg_index'])
+                if sp:
+                    conn2.execute("UPDATE transcript_segments SET speaker=? WHERE id=?",
+                                  (sp, row['id']))
+            conn2.commit()
+            conn2.close()
+        _ps(item_id, 'diarize', 'done', model=used)
+        log.info("diarized %s (multi=%s)", item_id, result['is_multi_speaker'])
+    except Exception as exc:
+        _ps(item_id, 'diarize', 'error', err=str(exc))
+        log.error("diarize %s: %s", item_id, exc)
     return item_id
 
 
