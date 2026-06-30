@@ -397,7 +397,27 @@ mark{background:rgba(126,184,247,.25);color:var(--gold);border-radius:.15em}
       <div class="ag" id="admin-stats"></div>
       <div class="sec-lbl"><span class="sec-ic">◈</span>پیشرفت کلی پردازش</div>
       <div id="admin-pipeline"></div>
-      <div class="sec-lbl" style="margin-top:1.2rem"><span class="sec-ic">≡</span>آیتم‌ها</div>
+
+      <div class="sec-lbl" style="margin-top:1.4rem"><span class="sec-ic">⚙</span>پیکربندی مدل‌ها
+        <button class="tmbtn on" id="cfg-save-btn" onclick="saveModelConfig()" style="margin-right:auto;font-size:.7rem">ذخیره</button>
+        <button class="tmbtn" onclick="testModelsUI()" style="font-size:.7rem">آزمون مقایسه‌ای</button>
+      </div>
+      <div id="model-cfg-wrap" style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem"></div>
+
+      <div id="model-test-wrap" style="display:none;margin-bottom:1rem">
+        <div class="panel">
+          <div class="p-hd"><span class="p-hd-ic">⚡</span>آزمون مدل‌ها</div>
+          <div class="p-bd">
+            <div style="display:flex;gap:.5rem;margin-bottom:.6rem;flex-wrap:wrap">
+              <input id="test-prompt" class="url-in" type="text" value="سلام، یک جمله کوتاه به فارسی بنویس." style="flex:1;font-size:.82rem;padding:.4rem .7rem">
+              <button class="btn-primary" onclick="runModelTest()" style="white-space:nowrap;font-size:.8rem">اجرا</button>
+            </div>
+            <div id="test-results"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec-lbl" style="margin-top:.4rem"><span class="sec-ic">≡</span>آیتم‌ها</div>
       <div style="overflow-x:auto">
         <table class="ptab" id="admin-table">
           <thead><tr>
@@ -1514,12 +1534,15 @@ async function loadQueue() {
 }
 
 // ── admin ─────────────────────────────────────────────────────────────────────
+const STEP_NAMES = {import:'دانلود',transcribe:'رونویسی',correct:'اصلاح',paragraphs:'فصل‌بندی',summarize:'خلاصه',mentions:'اشاره‌ها',infographic:'اینفوگرافیک',sacred:'متون مقدس',quotes:'نقل‌قول‌ها',artwork:'آرت‌ورک'};
+
 async function loadAdmin() {
-  const [stats, pipeStats, workers, itemsResp] = await Promise.all([
+  const [stats, pipeStats, workers, itemsResp, modelCfg] = await Promise.all([
     fetch('/api/stats').then(r => r.json()),
     fetch('/api/admin/pipeline-stats').then(r => r.json()),
     fetch('/api/admin/workers').then(r => r.json()),
     fetch('/api/items?limit=50').then(r => r.json()),
+    fetch('/api/admin/model-config').then(r => r.json()),
   ]);
 
   // Worker indicator
@@ -1537,32 +1560,187 @@ async function loadAdmin() {
     {v: stats.error||0, l:'خطا'},
   ].map(s => `<div class="sc"><div class="sc-v">${s.v}</div><div class="sc-l">${s.l}</div></div>`).join('');
 
-  // Pipeline bars
+  // Pipeline progress bars with avg timing
   const total = pipeStats.total || 1;
-  const stepNames = {import:'دانلود',transcribe:'رونویسی',correct:'اصلاح',paragraphs:'فصل‌بندی',summarize:'خلاصه',mentions:'اشاره‌ها',infographic:'اینفوگرافیک',sacred:'متون مقدس',quotes:'نقل‌قول‌ها',artwork:'آرت‌ورک'};
   const plEl = document.getElementById('admin-pipeline');
   plEl.innerHTML = Object.entries(pipeStats.steps||{}).map(([step, cnt]) => {
     const pct = Math.round((cnt / total) * 100);
+    const avg = pipeStats.avg_sec?.[step] ? ` · ${pipeStats.avg_sec[step]}ث` : '';
+    const mdl = pipeStats.last_model?.[step] ? `<span style="font-size:.6rem;font-family:var(--ff-mono);color:var(--gold);margin-right:.4rem">${esc(pipeStats.last_model[step])}</span>` : '';
     return `<div class="pbar-row">
-      <div class="pbar-lbl"><span>${stepNames[step]||step}</span><span>${cnt}/${total}</span></div>
+      <div class="pbar-lbl"><span>${STEP_NAMES[step]||step}${avg}</span><div style="display:flex;align-items:center">${mdl}<span>${cnt}/${total}</span></div></div>
       <div class="pbar-bg"><div class="pbar-f" style="width:${pct}%"></div></div>
     </div>`;
   }).join('');
 
-  // Items table
+  // Model config editor
+  ST._modelCfg = modelCfg;
+  const available = modelCfg.available || [];
+  const wrap = document.getElementById('model-cfg-wrap');
+  wrap.innerHTML = '';
+  [['asr','رونویسی (ASR)'], ['llm','هوش مصنوعی (LLM)']].forEach(([cat, label]) => {
+    const catModels = modelCfg[cat] || [];
+    const div = document.createElement('div');
+    div.className = 'panel';
+    div.innerHTML = `<div class="p-hd"><span class="p-hd-ic">⊕</span>${label}</div>
+      <div class="p-bd" id="cfg-${cat}">
+        <div class="cfg-order" id="cfg-list-${cat}"></div>
+        <select id="cfg-add-${cat}" style="margin-top:.5rem;width:100%;padding:.3rem;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);color:var(--tx);font-size:.78rem">
+          <option value="">+ افزودن مدل...</option>
+          ${available.filter(m => !catModels.includes(m)).map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('')}
+        </select>
+      </div>`;
+    wrap.appendChild(div);
+    const sel = div.querySelector(`#cfg-add-${cat}`);
+    sel.onchange = () => { if(sel.value) { addModelToCat(cat, sel.value); sel.value=''; } };
+    renderCatList(cat, catModels, available);
+  });
+
+  // Items table with per-step detail on expand
   const tbody = document.getElementById('admin-tbody');
   tbody.innerHTML = '';
   (itemsResp.items||[]).forEach(it => {
     const tr = document.createElement('tr');
+    tr.style.cursor = 'pointer';
     tr.innerHTML = `
-      <td class="td-t" onclick="nav('player',{id:'${it.id}'})">${esc(it.title||it.title_fa||'')}</td>
+      <td class="td-t">${esc(it.title||it.title_fa||'')}</td>
       <td><span class="c-src-badge src-${it.source||'di'}">${srcLabel(it.source)}</span></td>
       <td>${statusPill(it.status)}</td>
       <td style="font-family:var(--ff-mono);font-size:.78rem">${it.duration_sec?fmtDur(it.duration_sec):'-'}</td>
       <td style="font-size:.72rem;color:var(--mu)">${(it.created_at||'').slice(0,10)}</td>
-      <td><button class="tb-ic-btn" onclick="reprocess('${it.id}')">↺</button></td>`;
+      <td style="white-space:nowrap">
+        <button class="tb-ic-btn" onclick="event.stopPropagation();nav('player',{id:'${it.id}'})">⤢</button>
+        <button class="tb-ic-btn" onclick="event.stopPropagation();toggleSteps('${it.id}',this)">≡</button>
+        <button class="tb-ic-btn" onclick="event.stopPropagation();reprocess('${it.id}')">↺</button>
+      </td>`;
     tbody.appendChild(tr);
+    // hidden detail row
+    const det = document.createElement('tr');
+    det.id = 'steps-' + it.id;
+    det.style.display = 'none';
+    det.innerHTML = `<td colspan="6" style="padding:0"><div id="steps-bd-${it.id}" style="padding:.5rem .65rem;background:var(--surf)"></div></td>`;
+    tbody.appendChild(det);
   });
+}
+
+function renderCatList(cat, models, available) {
+  const el = document.getElementById('cfg-list-' + cat);
+  if (!el) return;
+  el.innerHTML = '';
+  models.forEach((m, i) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:.3rem;padding:.2rem 0;border-bottom:1px solid var(--line)';
+    row.innerHTML = `<span style="font-size:.62rem;font-family:var(--ff-mono);color:var(--mu);min-width:1rem">${i+1}</span>
+      <span style="flex:1;font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m)}</span>
+      <button class="tb-ic-btn" title="بالاتر" ${i===0?'disabled':''} onclick="moveCatModel('${cat}',${i},-1)" style="padding:.1rem .25rem">↑</button>
+      <button class="tb-ic-btn" title="پایین‌تر" ${i===models.length-1?'disabled':''} onclick="moveCatModel('${cat}',${i},1)" style="padding:.1rem .25rem">↓</button>
+      <button class="tb-ic-btn" onclick="removeCatModel('${cat}','${esc(m)}')" style="padding:.1rem .25rem;color:var(--err)">✕</button>`;
+    el.appendChild(row);
+  });
+}
+
+function addModelToCat(cat, model) {
+  const cfg = ST._modelCfg || {};
+  cfg[cat] = [...(cfg[cat]||[]), model];
+  ST._modelCfg = cfg;
+  const available = cfg.available || [];
+  renderCatList(cat, cfg[cat], available);
+  // remove from add select
+  const sel = document.getElementById('cfg-add-' + cat);
+  if (sel) sel.querySelector(`option[value="${model}"]`)?.remove();
+}
+
+function removeCatModel(cat, model) {
+  const cfg = ST._modelCfg || {};
+  cfg[cat] = (cfg[cat]||[]).filter(m => m !== model);
+  ST._modelCfg = cfg;
+  renderCatList(cat, cfg[cat], cfg.available||[]);
+  const sel = document.getElementById('cfg-add-' + cat);
+  if (sel) { const opt = document.createElement('option'); opt.value = model; opt.textContent = model; sel.appendChild(opt); }
+}
+
+function moveCatModel(cat, idx, dir) {
+  const cfg = ST._modelCfg || {};
+  const arr = [...(cfg[cat]||[])];
+  const ni = idx + dir;
+  if (ni < 0 || ni >= arr.length) return;
+  [arr[idx], arr[ni]] = [arr[ni], arr[idx]];
+  cfg[cat] = arr;
+  ST._modelCfg = cfg;
+  renderCatList(cat, arr, cfg.available||[]);
+}
+
+async function saveModelConfig() {
+  const cfg = ST._modelCfg || {};
+  const body = {asr: cfg.asr||[], llm: cfg.llm||[]};
+  await fetch('/api/admin/model-config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const btn = document.getElementById('cfg-save-btn');
+  const orig = btn.textContent;
+  btn.textContent = '✓ ذخیره شد';
+  setTimeout(() => { btn.textContent = orig; }, 2000);
+}
+
+async function toggleSteps(id, btn) {
+  const row = document.getElementById('steps-' + id);
+  if (!row) return;
+  const showing = row.style.display !== 'none';
+  row.style.display = showing ? 'none' : '';
+  if (!showing) {
+    const bd = document.getElementById('steps-bd-' + id);
+    bd.innerHTML = '<span class="ldots">در حال بارگذاری</span>';
+    const data = await fetch(`/api/items/${id}/progress`).then(r => r.json());
+    const steps = data.steps || [];
+    bd.innerHTML = `<table style="width:100%;font-size:.74rem;border-collapse:collapse">
+      <thead><tr style="color:var(--mu);font-size:.63rem">
+        <th style="text-align:right;padding:.2rem .4rem">مرحله</th>
+        <th style="padding:.2rem .4rem">وضعیت</th>
+        <th style="padding:.2rem .4rem;font-family:var(--ff-mono)">زمان (ث)</th>
+        <th style="padding:.2rem .4rem;font-family:var(--ff-mono)">مدل</th>
+      </tr></thead>
+      <tbody>${steps.map(s => `
+        <tr style="border-top:1px solid var(--line)">
+          <td style="padding:.25rem .4rem">${STEP_NAMES[s.step]||s.step}</td>
+          <td style="padding:.25rem .4rem">${statusPill(s.status)}</td>
+          <td style="padding:.25rem .4rem;font-family:var(--ff-mono);color:var(--mu)">${s.duration_sec != null ? s.duration_sec : s.status==='running'?'⟳':'-'}</td>
+          <td style="padding:.25rem .4rem;font-family:var(--ff-mono);font-size:.68rem;color:var(--gold)">${esc(s.model_used||'')}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  }
+}
+
+function testModelsUI() {
+  const wrap = document.getElementById('model-test-wrap');
+  wrap.style.display = wrap.style.display === 'none' ? '' : 'none';
+}
+
+async function runModelTest() {
+  const prompt = document.getElementById('test-prompt').value.trim();
+  const cfg = ST._modelCfg || {};
+  const models = [...(cfg.llm||[])].slice(0, 4);  // test top 4 LLM models
+  const resEl = document.getElementById('test-results');
+  resEl.innerHTML = '<span class="ldots">در حال آزمون</span>';
+  try {
+    const data = await fetch('/api/admin/test-model', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({category: 'llm', models, prompt})
+    }).then(r => r.json());
+    resEl.innerHTML = `<table style="width:100%;font-size:.75rem;border-collapse:collapse">
+      <thead><tr style="color:var(--mu);font-size:.63rem">
+        <th style="text-align:right;padding:.2rem .4rem">مدل</th>
+        <th style="padding:.2rem .4rem;font-family:var(--ff-mono)">تاخیر (ث)</th>
+        <th style="padding:.2rem .4rem">پاسخ</th>
+      </tr></thead>
+      <tbody>${(data.results||[]).map(r => `
+        <tr style="border-top:1px solid var(--line)">
+          <td style="padding:.3rem .4rem;font-family:var(--ff-mono);font-size:.68rem;white-space:nowrap">${esc(r.model)}</td>
+          <td style="padding:.3rem .4rem;font-family:var(--ff-mono);color:${r.ok?'var(--ok)':'var(--err)'}">${r.latency_sec}</td>
+          <td style="padding:.3rem .4rem;color:${r.ok?'var(--tx)':'var(--err)'}">${esc(r.ok?r.snippet:r.error||'')}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  } catch(e) {
+    resEl.innerHTML = `<div class="msg">خطا: ${esc(e.message)}</div>`;
+  }
 }
 
 async function reprocess(id) {

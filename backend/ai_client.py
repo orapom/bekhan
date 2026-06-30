@@ -14,6 +14,33 @@ log = logging.getLogger(__name__)
 _HEADERS = lambda: {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
 
 _LLM_FALLBACK_ORDER = ['DeepSeek-V3.2', 'DeepSeek-V3.1', 'GLM-4.6', 'Claude-Haiku-4.5', 'Qwen3-30B-A3B', 'Gemini-3.1-Flash-Lite-Preview']
+_ASR_FALLBACK_ORDER = ['GPT-4o-Transcribe', 'Whisper-1', 'Xerxes-1']  # no local whisper
+
+_last_model: dict = {'name': None}
+
+
+def get_last_model() -> str | None:
+    return _last_model['name']
+
+
+def _model_config() -> dict:
+    """Load optional /data/model_config.json for custom ordering."""
+    cfg_path = os.path.join(os.path.dirname(os.getenv('DB_PATH', '/data/bekhan.db')), 'model_config.json')
+    try:
+        with open(cfg_path) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _llm_order() -> list[str]:
+    cfg = _model_config()
+    return cfg.get('llm') or _LLM_FALLBACK_ORDER
+
+
+def _asr_order() -> list[str]:
+    cfg = _model_config()
+    return cfg.get('asr') or _ASR_FALLBACK_ORDER
 
 
 async def chat(messages: list[dict],
@@ -25,7 +52,7 @@ async def chat(messages: list[dict],
         raise RuntimeError("No LLM URL configured")
 
     candidates = [(LLM_URL, LLM_MODEL)] if LLM_URL else []
-    for m in _LLM_FALLBACK_ORDER:
+    for m in _llm_order():
         if m != LLM_MODEL and m in MODEL_URLS:
             candidates.append((MODEL_URLS[m], m))
 
@@ -50,6 +77,7 @@ async def chat(messages: list[dict],
                     last_exc = httpx.HTTPStatusError(f"{r.status_code}", request=r.request, response=r)
                     continue
                 r.raise_for_status()
+                _last_model['name'] = model_id
                 return r.json()['choices'][0]['message']['content']
             except httpx.HTTPStatusError as e:
                 log.warning("chat: %s HTTP error %s, trying fallback", model_id, e)
@@ -210,8 +238,7 @@ def _asr_model_id(config_key: str) -> str:
 
 
 async def _transcribe_bytes(audio_bytes: bytes, language: str) -> list:
-    asr_priority = ['mlx-whisper-local', 'GPT-4o-Transcribe', 'Whisper-1', 'Xerxes-1']
-    available = [(m, MODEL_URLS[m]) for m in asr_priority if m in MODEL_URLS]
+    available = [(m, MODEL_URLS[m]) for m in _asr_order() if m in MODEL_URLS]
     if not available:
         raise RuntimeError("No ASR URL configured")
 
@@ -222,6 +249,7 @@ async def _transcribe_bytes(audio_bytes: bytes, language: str) -> list:
         try:
             result = await _call_asr(url, model_id, audio_bytes, language)
             if result:
+                _last_model['name'] = config_key
                 return result
         except Exception as exc:
             last_exc = exc

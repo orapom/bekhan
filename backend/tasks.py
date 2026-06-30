@@ -35,11 +35,22 @@ def _run(coro):
         loop.close()
 
 
-def _ps(item_id: str, step: str, status: str, lang: str = '_', err: str = None):
+def _ps(item_id: str, step: str, status: str, lang: str = '_',
+        err: str | None = None, model: str | None = None):
     try:
-        db.set_pipeline_state(item_id, step, status, language=lang, error_msg=err)
+        db.set_pipeline_state(item_id, step, status, language=lang,
+                              error_msg=err, model_used=model)
     except Exception:
         pass
+
+
+def _m():
+    """Return the last model used by ai_client."""
+    try:
+        from ai_client import get_last_model
+        return get_last_model()
+    except Exception:
+        return None
 
 
 def _pipeline_chain(item_id: str):
@@ -200,12 +211,13 @@ def transcribe_item(self, item_id: str):
         from ai_client import transcribe_audio
         lang = item.get('language') or 'fa'
         seg_list = _run(transcribe_audio(audio_path, language=lang))
+        asr_model = _m()
         db.save_segments(item_id, 'fa', seg_list)
         dur = None
         if seg_list and seg_list[-1].get('end'):
             dur = seg_list[-1]['end']
         db.upsert_item({'id': item_id, 'duration_sec': dur, 'status': 'transcribed'})
-        _ps(item_id, 'transcribe', 'done')
+        _ps(item_id, 'transcribe', 'done', model=asr_model)
         log.info("transcribed %d segments for %s", len(seg_list), item_id)
         return item_id
     except Exception as exc:
@@ -246,6 +258,7 @@ def correct_transcript(self, item_id: str):
             title=item.get('title') or item.get('title_fa') or '',
             language=item.get('language') or 'fa',
         ))
+        llm_model = _m()
         conn2 = db.get_conn()
         for orig, fix in zip(segs_raw, corrected):
             if fix['text'] != orig['text']:
@@ -253,7 +266,7 @@ def correct_transcript(self, item_id: str):
                               (fix['text'], orig['id']))
         conn2.commit()
         conn2.close()
-        _ps(item_id, 'correct', 'done')
+        _ps(item_id, 'correct', 'done', model=llm_model)
     except Exception as exc:
         _ps(item_id, 'correct', 'error', err=str(exc))
         log.error("correct_transcript %s: %s", item_id, exc)
@@ -290,9 +303,10 @@ def generate_paragraphs(self, item_id: str):
         paras = _run(generate_book_paragraphs(
             seg_dicts, title=item.get('title') or item.get('title_fa') or ''
         ))
+        used: str = _m() or LLM_MODEL or ''
         db.save_ai_content(item_id, 'paragraphs', 'fa',
-                           json.dumps(paras, ensure_ascii=False), LLM_MODEL)
-        _ps(item_id, 'paragraphs', 'done')
+                           json.dumps(paras, ensure_ascii=False), used)
+        _ps(item_id, 'paragraphs', 'done', model=used)
         log.info("generated %d paragraphs for %s", len(paras), item_id)
     except Exception as exc:
         _ps(item_id, 'paragraphs', 'error', err=str(exc))
@@ -320,11 +334,12 @@ def summarize_item(self, item_id: str):
     _ps(item_id, 'summarize', 'running')
     try:
         result = _run(summarize_fa(full_text, title=title))
-        db.save_ai_content(item_id, 'summary', 'fa', result.get('summary_fa', ''), LLM_MODEL)
+        used: str = _m() or LLM_MODEL or ''
+        db.save_ai_content(item_id, 'summary', 'fa', result.get('summary_fa', ''), used)
         if result.get('main_theme'):
-            db.save_ai_content(item_id, 'main_theme', 'fa', result['main_theme'], LLM_MODEL)
+            db.save_ai_content(item_id, 'main_theme', 'fa', result['main_theme'], used)
         db.set_status(item_id, 'summarized')
-        _ps(item_id, 'summarize', 'done')
+        _ps(item_id, 'summarize', 'done', model=used)
         log.info("summarized %s", item_id)
     except Exception as exc:
         _ps(item_id, 'summarize', 'error', err=str(exc))
@@ -348,9 +363,10 @@ def extract_mentions_task(self, item_id: str):
     _ps(item_id, 'mentions', 'running')
     try:
         data = _run(extract_mentions(full_text))
+        used: str = _m() or LLM_MODEL or ''
         db.save_ai_content(item_id, 'mentions', 'fa',
-                           json.dumps(data, ensure_ascii=False), LLM_MODEL)
-        _ps(item_id, 'mentions', 'done')
+                           json.dumps(data, ensure_ascii=False), used)
+        _ps(item_id, 'mentions', 'done', model=used)
     except Exception as exc:
         _ps(item_id, 'mentions', 'error', err=str(exc))
         log.error("mentions %s: %s", item_id, exc)
@@ -384,9 +400,10 @@ def generate_infographic_task(self, item_id: str):
     _ps(item_id, 'infographic', 'running')
     try:
         data = _run(generate_infographic(full_text, summary_fa=summary_fa, title=title))
+        used: str = _m() or LLM_MODEL or ''
         db.save_ai_content(item_id, 'infographic', 'fa',
-                           json.dumps(data, ensure_ascii=False), LLM_MODEL)
-        _ps(item_id, 'infographic', 'done')
+                           json.dumps(data, ensure_ascii=False), used)
+        _ps(item_id, 'infographic', 'done', model=used)
     except Exception as exc:
         _ps(item_id, 'infographic', 'error', err=str(exc))
         log.error("infographic %s: %s", item_id, exc)
@@ -419,9 +436,10 @@ def mark_sacred_segments_task(self, item_id: str):
     _ps(item_id, 'sacred', 'running')
     try:
         indices = _run(mark_sacred_segments(seg_dicts))
+        used: str = _m() or LLM_MODEL or ''
         db.save_ai_content(item_id, 'sacred_segs', 'fa',
-                           json.dumps(indices, ensure_ascii=False), LLM_MODEL)
-        _ps(item_id, 'sacred', 'done')
+                           json.dumps(indices, ensure_ascii=False), used)
+        _ps(item_id, 'sacred', 'done', model=used)
     except Exception as exc:
         _ps(item_id, 'sacred', 'error', err=str(exc))
         log.error("sacred_segs %s: %s", item_id, exc)
@@ -454,9 +472,10 @@ def mark_external_quotes_task(self, item_id: str):
     _ps(item_id, 'quotes', 'running')
     try:
         indices = _run(mark_external_quotes(seg_dicts))
+        used: str = _m() or LLM_MODEL or ''
         db.save_ai_content(item_id, 'ext_quotes', 'fa',
-                           json.dumps(indices, ensure_ascii=False), LLM_MODEL)
-        _ps(item_id, 'quotes', 'done')
+                           json.dumps(indices, ensure_ascii=False), used)
+        _ps(item_id, 'quotes', 'done', model=used)
     except Exception as exc:
         _ps(item_id, 'quotes', 'error', err=str(exc))
         log.error("ext_quotes %s: %s", item_id, exc)
@@ -512,9 +531,10 @@ def generate_artwork_task(self, item_id: str):
             thumbnail_b64=thumbnail_b64,
             thumbnail_mime=thumbnail_mime,
         ))
+        used: str = _m() or LLM_MODEL or ''
         db.save_ai_content(item_id, 'artwork', 'fa', artwork)
         db.set_status(item_id, 'done')
-        _ps(item_id, 'artwork', 'done')
+        _ps(item_id, 'artwork', 'done', model=used)
         log.info("artwork generated for %s", item_id)
     except Exception as exc:
         _ps(item_id, 'artwork', 'error', err=str(exc))

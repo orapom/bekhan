@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS pipeline_state (
     started_at TEXT,
     done_at    TEXT,
     error_msg  TEXT,
+    model_used TEXT,
     PRIMARY KEY (item_id, step, language)
 );
 """
@@ -80,6 +81,12 @@ def get_conn() -> sqlite3.Connection:
 def init_db():
     with get_conn() as conn:
         conn.executescript(SCHEMA)
+        # live migration: add model_used if missing (existing DBs)
+        try:
+            conn.execute("ALTER TABLE pipeline_state ADD COLUMN model_used TEXT")
+            conn.commit()
+        except Exception:
+            pass
 
 
 def _now():
@@ -242,27 +249,28 @@ def list_items(limit: int = 100, source: str = None, status: str = None,
 
 
 def set_pipeline_state(item_id: str, step: str, status: str,
-                       language: str = '_', error_msg: str = None):
+                       language: str = '_', error_msg: str | None = None,
+                       model_used: str | None = None):
     conn = get_conn()
     try:
         now = _now()
         if status == 'running':
             conn.execute(
                 "INSERT OR REPLACE INTO pipeline_state "
-                "(item_id, step, language, status, started_at, done_at, error_msg) "
-                "VALUES (?, ?, ?, 'running', ?, NULL, NULL)",
+                "(item_id, step, language, status, started_at, done_at, error_msg, model_used) "
+                "VALUES (?, ?, ?, 'running', ?, NULL, NULL, NULL)",
                 (item_id, step, language, now)
             )
         else:
             conn.execute(
                 "INSERT OR REPLACE INTO pipeline_state "
-                "(item_id, step, language, status, started_at, done_at, error_msg) "
+                "(item_id, step, language, status, started_at, done_at, error_msg, model_used) "
                 "VALUES (?, ?, ?, ?, "
                 "COALESCE((SELECT started_at FROM pipeline_state WHERE item_id=? AND step=? AND language=?), ?), "
-                "?, ?)",
+                "?, ?, ?)",
                 (item_id, step, language, status,
                  item_id, step, language, now,
-                 now, error_msg)
+                 now, error_msg, model_used)
             )
         conn.commit()
     finally:
@@ -273,11 +281,32 @@ def get_pipeline_progress(item_id: str) -> list:
     conn = get_conn()
     try:
         rows = conn.execute(
-            "SELECT step, language, status, started_at, done_at, error_msg "
+            "SELECT step, language, status, started_at, done_at, error_msg, model_used "
             "FROM pipeline_state WHERE item_id=? ORDER BY started_at",
             (item_id,)
         ).fetchall()
-        return [dict(r) for r in rows]
+        result = []
+        for r in rows:
+            d = dict(r)
+            # compute duration_sec from timestamps
+            if d.get('started_at') and d.get('done_at'):
+                try:
+                    from datetime import datetime, timezone
+                    fmt = '%Y-%m-%dT%H:%M:%S.%f+00:00'
+                    def _parse(s):
+                        for f in (fmt, '%Y-%m-%dT%H:%M:%S+00:00', '%Y-%m-%dT%H:%M:%S.%fZ'):
+                            try: return datetime.strptime(s, f).replace(tzinfo=timezone.utc)
+                            except: pass
+                        return None
+                    t0, t1 = _parse(d['started_at']), _parse(d['done_at'])
+                    if t0 and t1:
+                        d['duration_sec'] = round((t1 - t0).total_seconds(), 1)
+                except Exception:
+                    d['duration_sec'] = None
+            else:
+                d['duration_sec'] = None
+            result.append(d)
+        return result
     finally:
         conn.close()
 
@@ -342,12 +371,27 @@ def get_pipeline_stats() -> dict:
                  'mentions', 'infographic', 'sacred', 'quotes', 'artwork']
         total = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
         done = conn.execute("SELECT COUNT(*) FROM items WHERE status='done'").fetchone()[0]
-        result = {'total': total, 'done': done, 'steps': {}}
+        result: dict = {'total': total, 'done': done, 'steps': {}, 'avg_sec': {}, 'last_model': {}}
         for step in steps:
             row = conn.execute(
                 "SELECT COUNT(*) as c FROM pipeline_state WHERE step=? AND status='done'", (step,)
             ).fetchone()
             result['steps'][step] = row['c'] if row else 0
+            # average duration for done steps that have both timestamps
+            avg_row = conn.execute(
+                "SELECT AVG((julianday(done_at) - julianday(started_at)) * 86400) as avg "
+                "FROM pipeline_state WHERE step=? AND status='done' AND started_at IS NOT NULL AND done_at IS NOT NULL",
+                (step,)
+            ).fetchone()
+            if avg_row and avg_row['avg']:
+                result['avg_sec'][step] = round(float(avg_row['avg']), 1)
+            # last model used for this step
+            mdl_row = conn.execute(
+                "SELECT model_used FROM pipeline_state WHERE step=? AND status='done' AND model_used IS NOT NULL "
+                "ORDER BY done_at DESC LIMIT 1", (step,)
+            ).fetchone()
+            if mdl_row and mdl_row['model_used']:
+                result['last_model'][step] = mdl_row['model_used']
         return result
     finally:
         conn.close()

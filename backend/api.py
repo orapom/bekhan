@@ -468,6 +468,88 @@ def list_tags():
     return {'tags': db.get_all_tags()}
 
 
+# ── model config ──────────────────────────────────────────────────────────────
+
+_MODEL_CONFIG_PATH = os.path.join(os.path.dirname(os.getenv('DB_PATH', '/data/bekhan.db')), 'model_config.json')
+
+_DEFAULT_CONFIG = {
+    "asr":   ["GPT-4o-Transcribe", "Whisper-1", "Xerxes-1"],
+    "llm":   ["DeepSeek-V3.2", "DeepSeek-V3.1", "GLM-4.6",
+               "Claude-Haiku-4.5", "Qwen3-30B-A3B", "Gemini-3.1-Flash-Lite-Preview"],
+    "image": [],
+}
+
+
+def _load_model_config() -> dict:
+    try:
+        with open(_MODEL_CONFIG_PATH) as f:
+            return json.load(f)
+    except Exception:
+        return dict(_DEFAULT_CONFIG)
+
+
+def _save_model_config(cfg: dict):
+    os.makedirs(os.path.dirname(_MODEL_CONFIG_PATH), exist_ok=True)
+    with open(_MODEL_CONFIG_PATH, 'w') as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+
+@app.get('/api/admin/model-config')
+def get_model_config():
+    from config import MODEL_URLS
+    cfg = _load_model_config()
+    # add available_models so UI knows what keys exist
+    cfg['available'] = list(MODEL_URLS.keys())
+    return cfg
+
+
+@app.post('/api/admin/model-config')
+def save_model_config(body: dict, _: None = Depends(_check_secret)):
+    allowed = {'asr', 'llm', 'image'}
+    new_cfg = {k: v for k, v in body.items() if k in allowed and isinstance(v, list)}
+    _save_model_config(new_cfg)
+    return {'ok': True}
+
+
+@app.post('/api/admin/test-model')
+async def test_model(body: dict):
+    """Run a quick test prompt against specified models and return latency + snippet."""
+    import time
+    import httpx as _httpx
+    from config import MODEL_URLS, API_KEY
+
+    category = body.get('category', 'llm')  # 'llm' | 'asr'
+    models = body.get('models') or []
+    prompt = body.get('prompt') or 'سلام، یک جمله کوتاه به فارسی بنویس.'
+
+    results = []
+    if category == 'llm':
+        for model_key in models:
+            if model_key not in MODEL_URLS:
+                results.append({'model': model_key, 'error': 'not configured'})
+                continue
+            url = MODEL_URLS[model_key]
+            t0 = time.time()
+            try:
+                import httpx as _httpx
+                async with _httpx.AsyncClient(timeout=30) as client:
+                    r = await client.post(
+                        url.rstrip('/') + '/chat/completions',
+                        json={'model': model_key, 'messages': [{'role': 'user', 'content': prompt}],
+                              'max_tokens': 100, 'temperature': 0.3},
+                        headers={'Authorization': f'Bearer {API_KEY}', 'Content-Type': 'application/json'}
+                    )
+                    r.raise_for_status()
+                    text = r.json()['choices'][0]['message']['content']
+                elapsed = round(time.time() - t0, 2)
+                results.append({'model': model_key, 'latency_sec': elapsed,
+                                 'snippet': text[:200], 'ok': True})
+            except Exception as exc:
+                results.append({'model': model_key, 'latency_sec': round(time.time()-t0, 2),
+                                 'error': str(exc)[:120], 'ok': False})
+    return {'results': results}
+
+
 # ── admin ─────────────────────────────────────────────────────────────────────
 
 @app.get('/api/admin/pipeline-stats')
