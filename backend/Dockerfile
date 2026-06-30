@@ -1,16 +1,8 @@
-FROM python:3.11-slim
-
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    gcc \
-    g++ \
-    libgomp1 \
-    curl \
- && rm -rf /var/lib/apt/lists/*
+FROM jost-api:latest
 
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && pip install --upgrade yt-dlp
 
 COPY . .

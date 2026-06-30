@@ -99,13 +99,16 @@ def import_item(body: dict, _: None = Depends(_check_secret)):
         return {'id': existing['id'], 'status': 'existing'}
 
     import uuid as _uuid
+    from media_import import detect_source
     item_id = str(_uuid.uuid4())
     collections = json.dumps(body.get('collections') or [], ensure_ascii=False)
     tags = json.dumps(body.get('tags') or [], ensure_ascii=False)
+    src = detect_source(url)
 
     db.upsert_item({
         'id': item_id,
         'url_source': url,
+        'source': src,
         'title': body.get('title') or '',
         'collections_json': collections,
         'tags_json': tags,
