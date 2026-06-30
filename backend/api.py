@@ -118,7 +118,7 @@ def import_item(body: dict, _: None = Depends(_check_secret)):
     from celery import chain as cchain
     from tasks import import_url, transcribe_item, correct_transcript, diarize_item, generate_paragraphs
     from tasks import summarize_item, extract_mentions_task, generate_infographic_task
-    from tasks import mark_sacred_segments_task, mark_external_quotes_task, generate_artwork_task
+    from tasks import mark_sacred_segments_task, mark_external_quotes_task, generate_artwork_task, translate_item
 
     cchain(
         import_url.si(item_id),
@@ -132,6 +132,7 @@ def import_item(body: dict, _: None = Depends(_check_secret)):
         mark_sacred_segments_task.si(item_id),
         mark_external_quotes_task.si(item_id),
         generate_artwork_task.si(item_id),
+        translate_item.si(item_id),
     ).apply_async()
 
     return {'id': item_id, 'status': 'queued'}
@@ -181,7 +182,7 @@ async def upload_item(
     from celery import chain as cchain
     from tasks import import_upload, transcribe_item, correct_transcript, diarize_item, generate_paragraphs
     from tasks import summarize_item, extract_mentions_task, generate_infographic_task
-    from tasks import mark_sacred_segments_task, mark_external_quotes_task, generate_artwork_task
+    from tasks import mark_sacred_segments_task, mark_external_quotes_task, generate_artwork_task, translate_item
 
     cchain(
         import_upload.si(item_id),
@@ -195,6 +196,7 @@ async def upload_item(
         mark_sacred_segments_task.si(item_id),
         mark_external_quotes_task.si(item_id),
         generate_artwork_task.si(item_id),
+        translate_item.si(item_id),
     ).apply_async()
 
     return {'id': item_id, 'status': 'queued'}
@@ -209,7 +211,7 @@ def reprocess_item(item_id: str, _: None = Depends(_check_secret)):
     from celery import chain as cchain
     from tasks import transcribe_item, correct_transcript, diarize_item, generate_paragraphs
     from tasks import summarize_item, extract_mentions_task, generate_infographic_task
-    from tasks import mark_sacred_segments_task, mark_external_quotes_task, generate_artwork_task
+    from tasks import mark_sacred_segments_task, mark_external_quotes_task, generate_artwork_task, translate_item
 
     db.set_status(item_id, 'indexed')
     cchain(
@@ -223,6 +225,7 @@ def reprocess_item(item_id: str, _: None = Depends(_check_secret)):
         mark_sacred_segments_task.si(item_id),
         mark_external_quotes_task.si(item_id),
         generate_artwork_task.si(item_id),
+        translate_item.si(item_id),
     ).apply_async()
     return {'ok': True}
 
@@ -495,10 +498,12 @@ def list_tags():
 _MODEL_CONFIG_PATH = os.path.join(os.path.dirname(os.getenv('DB_PATH', '/data/bekhan.db')), 'model_config.json')
 
 _DEFAULT_CONFIG = {
-    "asr":   ["GPT-4o-Transcribe", "Whisper-1", "Xerxes-1"],
-    "llm":   ["DeepSeek-V3.2", "DeepSeek-V3.1", "GLM-4.6",
-               "Claude-Haiku-4.5", "Qwen3-30B-A3B", "Gemini-3.1-Flash-Lite-Preview"],
-    "image": [],
+    "asr":       ["GPT-4o-Transcribe", "Whisper-1", "Xerxes-1"],
+    "llm":       ["DeepSeek-V3.2", "DeepSeek-V3.1", "GLM-4.6",
+                  "Claude-Haiku-4.5", "Qwen3-30B-A3B", "Gemini-3.1-Flash-Lite-Preview"],
+    "image":     [],
+    "translate": False,   # set true to enable auto-translation to English
+    "asr_dual":  False,   # set true to run dual ASR+LLM merge
 }
 
 
@@ -527,8 +532,10 @@ def get_model_config():
 
 @app.post('/api/admin/model-config')
 def save_model_config(body: dict, _: None = Depends(_check_secret)):
-    allowed = {'asr', 'llm', 'image'}
-    new_cfg = {k: v for k, v in body.items() if k in allowed and isinstance(v, list)}
+    list_keys = {'asr', 'llm', 'image'}
+    bool_keys = {'translate', 'asr_dual'}
+    new_cfg = {k: v for k, v in body.items() if k in list_keys and isinstance(v, list)}
+    new_cfg.update({k: bool(v) for k, v in body.items() if k in bool_keys})
     _save_model_config(new_cfg)
     return {'ok': True}
 

@@ -59,6 +59,7 @@ def _pipeline_chain(item_id: str):
     return chain(
         transcribe_item.si(item_id),
         correct_transcript.si(item_id),
+        translate_item.si(item_id),
         diarize_item.si(item_id),
         generate_paragraphs.si(item_id),
         summarize_item.si(item_id),
@@ -287,6 +288,46 @@ def correct_transcript(self, item_id: str):
     except Exception as exc:
         _ps(item_id, 'correct', 'error', err=str(exc))
         log.error("correct_transcript %s: %s", item_id, exc)
+    return item_id
+
+
+# ── translate ─────────────────────────────────────────────────────────────────
+
+@app.task(name='translate_item', bind=True)
+def translate_item(self, item_id: str):
+    from ai_client import translate_to_english, _model_config
+
+    if not _model_config().get('translate'):
+        return item_id
+
+    if db.transcript_segment_count(item_id, 'en') > 0:
+        _ps(item_id, 'translate', 'done')
+        return item_id
+
+    conn = db.get_conn()
+    segs_raw = conn.execute(
+        "SELECT seg_index, start_sec, end_sec, text FROM transcript_segments "
+        "WHERE item_id=? AND language='fa' ORDER BY seg_index",
+        (item_id,)
+    ).fetchall()
+    conn.close()
+    if not segs_raw:
+        return item_id
+
+    seg_dicts = [{'seg_index': r['seg_index'], 'start': r['start_sec'],
+                  'end': r['end_sec'], 'text': r['text']}
+                 for r in segs_raw]
+
+    _ps(item_id, 'translate', 'running')
+    try:
+        translated = _run(translate_to_english(seg_dicts))
+        used: str = _m() or LLM_MODEL or ''
+        db.save_segments(item_id, 'en', translated)
+        _ps(item_id, 'translate', 'done', model=used)
+        log.info("translated %d segments for %s", len(translated), item_id)
+    except Exception as exc:
+        _ps(item_id, 'translate', 'error', err=str(exc))
+        log.error("translate %s: %s", item_id, exc)
     return item_id
 
 

@@ -235,6 +235,18 @@ mark{background:rgba(126,184,247,.25);color:var(--gold);border-radius:.15em}
 .ask-in{flex:1;padding:.5rem .75rem;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);color:var(--tx);font-size:.88rem;font-family:var(--ff-fa)}
 .ask-in:focus{outline:none;border-color:var(--gold)}
 .ask-ans{margin-top:.7rem;font-size:.88rem;line-height:1.8;color:var(--tx);border-right:2px solid var(--gold);padding-right:.75rem}
+/* Player ask chat */
+.ask-hist{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:.35rem;margin-bottom:.5rem;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.ask-msg{font-size:.78rem;line-height:1.6;padding:.4rem .55rem;border-radius:var(--r)}
+.ask-q{background:var(--gold2);color:var(--tx);text-align:right;border-right:2px solid var(--gold)}
+.ask-a{background:var(--surf);color:var(--tx);border-right:2px solid var(--line)}
+.ask-err{background:rgba(179,89,80,.1);color:var(--err);border-right:2px solid var(--err)}
+/* Bulk import */
+.bulk-ta{width:100%;min-height:90px;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);color:var(--tx);font-size:.82rem;font-family:var(--ff-mono);padding:.5rem .75rem;resize:vertical;direction:ltr;box-sizing:border-box}
+.bulk-ta:focus{outline:none;border-color:var(--gold)}
+.bulk-result{font-size:.73rem;padding:.2rem 0;border-bottom:1px solid var(--line);display:flex;gap:.4rem;align-items:center}
+.bulk-ok{color:var(--ok)}
+.bulk-err{color:var(--err)}
 /* Admin */
 .ag{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:.75rem;margin-bottom:1.5rem}
 .sc{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:.85rem .9rem}
@@ -367,6 +379,10 @@ mark{background:rgba(126,184,247,.25);color:var(--gold);border-radius:.15em}
               <button class="tmbtn on" id="tm-karaoke" onclick="setTrMode('karaoke')">کاراوکه</button>
               <button class="tmbtn" id="tm-book" onclick="setTrMode('book')">کتابچه</button>
             </div>
+            <div style="display:flex;gap:.2rem;margin-right:auto">
+              <button class="tmbtn on" id="tm-lang-fa" onclick="setTrLang('fa')" title="فارسی">FA</button>
+              <button class="tmbtn" id="tm-lang-en" onclick="setTrLang('en')" title="English">EN</button>
+            </div>
           </div>
           <div class="tr-wrap" id="tr-wrap">
             <div class="msg ldots" id="tr-loading">در حال بارگذاری رونویسی</div>
@@ -385,6 +401,19 @@ mark{background:rgba(126,184,247,.25);color:var(--gold);border-radius:.15em}
           <div class="panel" id="pn-mentions" style="display:none">
             <div class="p-hd"><span class="p-hd-ic">◉</span>اشاره‌ها</div>
             <div class="p-bd" id="mentions-bd"></div>
+          </div>
+          <div class="panel" id="pn-ask">
+            <div class="p-hd"><span class="p-hd-ic">💬</span>پرسش از محتوا</div>
+            <div class="p-bd">
+              <div class="ask-hist" id="pl-ask-hist"></div>
+              <div style="display:flex;gap:.35rem">
+                <input id="pl-ask-in" class="ask-in" type="text" placeholder="سوال بپرس..."
+                       style="font-size:.78rem;padding:.3rem .55rem"
+                       onkeydown="if(event.key==='Enter')doPlayerAsk()">
+                <button class="btn-primary" onclick="doPlayerAsk()"
+                        style="font-size:.72rem;padding:.3rem .6rem;white-space:nowrap">→</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -429,6 +458,17 @@ mark{background:rgba(126,184,247,.25);color:var(--gold);border-radius:.15em}
         <div style="font-size:.75rem;color:var(--mu);margin-top:.3rem">MP4, WebM, MP3, M4A, WAV و ...</div>
         <input id="file-in" type="file" accept="video/*,audio/*" style="display:none" onchange="handleFileInput(event)">
       </div>
+      <div class="sec-lbl" style="margin-top:.9rem"><span class="sec-ic">≡</span>وارد کردن گروهی
+        <span style="font-size:.65rem;font-weight:400;color:var(--mu)">هر لینک در یک خط</span>
+      </div>
+      <textarea id="bulk-urls" class="bulk-ta" rows="4" dir="ltr"
+                placeholder="https://aparat.com/v/...&#10;https://aparat.com/v/...&#10;https://..."></textarea>
+      <div style="display:flex;gap:.5rem;margin-top:.5rem;margin-bottom:.9rem">
+        <button class="btn-primary" onclick="importBulk()" style="font-size:.8rem">+ وارد کردن همه</button>
+        <button class="tmbtn" onclick="document.getElementById('bulk-urls').value=''" style="font-size:.8rem">پاک کردن</button>
+      </div>
+      <div id="bulk-results"></div>
+
       <div class="sec-lbl"><span class="sec-ic">◷</span>صف پردازش</div>
       <div id="queue-list" class="queue-list"></div>
     </div>
@@ -519,6 +559,7 @@ const ST = {
   item: null,        // current item data
   ai: null,          // AI content for current item
   trMode: 'karaoke', // karaoke | book
+  trLang: 'fa',      // fa | en
   trSegs: [],        // transcript segments
   paragraphs: [],    // book paragraphs
   sacredSet: new Set(),
@@ -1022,7 +1063,11 @@ async function openPlayer(id, autoplay = false) {
   ST.speakersMap = {};
   ST.speakerNames = {};
   ST.isMultiSpeaker = false;
+  ST.trLang = 'fa';
   _lastKaraokeIdx = -1;
+  // reset lang toggle
+  document.getElementById('tm-lang-fa').className = 'tmbtn on';
+  document.getElementById('tm-lang-en').className = 'tmbtn';
   Player.destroy();
 
   const item = await fetch(`/api/items/${id}`).then(r => r.json());
@@ -1276,6 +1321,41 @@ function setTrMode(mode) {
   document.getElementById('tm-karaoke').className = 'tmbtn' + (mode==='karaoke'?' on':'');
   document.getElementById('tm-book').className = 'tmbtn' + (mode==='book'?' on':'');
   renderTranscript();
+}
+
+async function setTrLang(lang) {
+  document.getElementById('tm-lang-fa').className = 'tmbtn' + (lang==='fa'?' on':'');
+  document.getElementById('tm-lang-en').className = 'tmbtn' + (lang==='en'?' on':'');
+  const id = ST.id;
+  if (!id) return;
+  const cacheKey = id + '_' + lang;
+  if (ST.trCache[cacheKey]) {
+    ST.trSegs = ST.trCache[cacheKey];
+    if (lang === 'fa') {
+      ST.speakersMap = {};
+      ST.trSegs.forEach(s => { if (s.speaker) ST.speakersMap[s.seg_index ?? 0] = s.speaker; });
+    } else {
+      ST.speakersMap = {};
+      ST.isMultiSpeaker = false;
+    }
+    renderTranscript();
+    return;
+  }
+  document.getElementById('tr-wrap').innerHTML = '<div class="msg ldots">در حال بارگذاری</div>';
+  try {
+    const data = await fetch(`/api/items/${id}/transcript?lang=${lang}`).then(r => r.json());
+    const segs = data.segments || [];
+    ST.trCache[cacheKey] = segs;
+    ST.trSegs = segs;
+    ST.speakersMap = {};
+    if (lang === 'fa') segs.forEach(s => { if (s.speaker) ST.speakersMap[s.seg_index ?? 0] = s.speaker; });
+    else { ST.isMultiSpeaker = false; }
+    renderTranscript();
+  } catch {
+    document.getElementById('tr-wrap').innerHTML = lang === 'en'
+      ? '<div class="msg">ترجمه‌ای موجود نیست — ترجمه خودکار را از تنظیمات مدل فعال کنید</div>'
+      : '<div class="msg">رونویسی موجود نیست</div>';
+  }
 }
 
 function renderChapterStrip() {
@@ -1705,7 +1785,7 @@ async function loadQueue() {
 }
 
 // ── admin ─────────────────────────────────────────────────────────────────────
-const STEP_NAMES = {import:'دانلود',transcribe:'رونویسی',correct:'اصلاح',diarize:'گویندگان',paragraphs:'فصل‌بندی',summarize:'خلاصه',mentions:'اشاره‌ها',infographic:'اینفوگرافیک',sacred:'متون مقدس',quotes:'نقل‌قول‌ها',artwork:'آرت‌ورک'};
+const STEP_NAMES = {import:'دانلود',transcribe:'رونویسی',correct:'اصلاح',translate:'ترجمه',diarize:'گویندگان',paragraphs:'فصل‌بندی',summarize:'خلاصه',mentions:'اشاره‌ها',infographic:'اینفوگرافیک',sacred:'متون مقدس',quotes:'نقل‌قول‌ها',artwork:'آرت‌ورک'};
 
 async function loadAdmin() {
   const [stats, pipeStats, workers, itemsResp, modelCfg, promptCfg, collsResp, tagsResp] = await Promise.all([
@@ -1769,6 +1849,23 @@ async function loadAdmin() {
     sel.onchange = () => { if(sel.value) { addModelToCat(cat, sel.value); sel.value=''; } };
     renderCatList(cat, catModels, available);
   });
+
+  // Boolean toggles: translate, asr_dual
+  const togglesDiv = document.createElement('div');
+  togglesDiv.style.cssText = 'grid-column:1/-1;display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:.5rem';
+  [['translate','ترجمه خودکار به انگلیسی'],['asr_dual','حالت دو‌مدله (ASR Dual)']].forEach(([key, label]) => {
+    const id = 'tog-' + key;
+    const checked = modelCfg[key] ? 'checked' : '';
+    const span = document.createElement('label');
+    span.style.cssText = 'display:flex;align-items:center;gap:.4rem;font-size:.8rem;cursor:pointer';
+    span.innerHTML = `<input type="checkbox" id="${id}" ${checked} style="cursor:pointer"> ${esc(label)}`;
+    span.querySelector('input').onchange = e => {
+      ST._modelCfg = ST._modelCfg || {};
+      ST._modelCfg[key] = e.target.checked;
+    };
+    togglesDiv.appendChild(span);
+  });
+  wrap.appendChild(togglesDiv);
 
   // Prompt config editor
   ST._promptCfg = promptCfg;
@@ -1882,7 +1979,11 @@ function moveCatModel(cat, idx, dir) {
 
 async function saveModelConfig() {
   const cfg = ST._modelCfg || {};
-  const body = {asr: cfg.asr||[], llm: cfg.llm||[]};
+  const body = {
+    asr: cfg.asr||[], llm: cfg.llm||[],
+    translate: cfg.translate || false,
+    asr_dual: cfg.asr_dual || false,
+  };
   await fetch('/api/admin/model-config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
   const btn = document.getElementById('cfg-save-btn');
   const orig = btn.textContent;
@@ -2044,6 +2145,78 @@ function statusPill(st) {
 
 function _parseTags(json) {
   try { const v = JSON.parse(json||'[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+
+// ── player Q&A ────────────────────────────────────────────────────────────────
+
+async function doPlayerAsk() {
+  const input = document.getElementById('pl-ask-in');
+  const q = (input?.value || '').trim();
+  if (!q || !ST.id) return;
+  input.value = '';
+  const hist = document.getElementById('pl-ask-hist');
+  if (!hist) return;
+  const qEl = document.createElement('div');
+  qEl.className = 'ask-msg ask-q';
+  qEl.textContent = q;
+  hist.appendChild(qEl);
+  const typing = document.createElement('div');
+  typing.className = 'ask-msg ask-a ldots';
+  typing.textContent = '...';
+  hist.appendChild(typing);
+  hist.scrollTop = hist.scrollHeight;
+  try {
+    const data = await fetch(`/api/items/${ST.id}/ask`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question: q}),
+    }).then(r => r.json());
+    typing.className = 'ask-msg ask-a';
+    typing.textContent = data.answer || '';
+  } catch(e) {
+    typing.className = 'ask-msg ask-err';
+    typing.textContent = 'خطا: ' + (e.message || '');
+  }
+  hist.scrollTop = hist.scrollHeight;
+}
+
+// ── bulk import ───────────────────────────────────────────────────────────────
+
+async function importBulk() {
+  const ta = document.getElementById('bulk-urls');
+  const lines = (ta?.value || '').split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return;
+  const resultsEl = document.getElementById('bulk-results');
+  resultsEl.innerHTML = `<div style="font-size:.75rem;color:var(--mu);margin-bottom:.4rem">پردازش ${lines.length} لینک...</div>`;
+  let okCount = 0, errCount = 0;
+  for (const url of lines) {
+    try {
+      const data = await fetch('/api/items', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({url}),
+      }).then(r => r.json());
+      okCount++;
+      const row = document.createElement('div');
+      row.className = 'bulk-result';
+      row.innerHTML = `<span class="bulk-ok">✓</span><span>${esc(url.length > 70 ? url.slice(0,70)+'…' : url)}</span>` +
+        (data.status === 'existing' ? `<span style="color:var(--mu);font-size:.65rem">موجود</span>` : '');
+      resultsEl.appendChild(row);
+    } catch(e) {
+      errCount++;
+      const row = document.createElement('div');
+      row.className = 'bulk-result';
+      row.innerHTML = `<span class="bulk-err">✗</span><span>${esc(url.length > 70 ? url.slice(0,70)+'…' : url)}</span>` +
+        `<span style="color:var(--err);font-size:.65rem">${esc(e.message||'')}</span>`;
+      resultsEl.appendChild(row);
+    }
+  }
+  const sum = document.createElement('div');
+  sum.style.cssText = 'font-size:.75rem;color:var(--mu);margin-top:.4rem';
+  sum.textContent = `${okCount} افزوده شد · ${errCount} خطا`;
+  resultsEl.insertBefore(sum, resultsEl.firstChild);
+  ta.value = '';
+  loadQueue();
 }
 
 // ── collections & tags management ─────────────────────────────────────────────

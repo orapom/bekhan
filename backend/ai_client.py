@@ -626,6 +626,33 @@ async def mark_sacred_segments(segments: list) -> list:
         return []
 
 
+async def translate_to_english(segments: list) -> list:
+    """Translate Persian/Arabic transcript segments to English."""
+    if not segments:
+        return segments
+    BATCH = 100
+    results = list(segments)
+    for batch_start in range(0, len(segments), BATCH):
+        batch = segments[batch_start: batch_start + BATCH]
+        lines = [f"{i+1}. {s['text']}" for i, s in enumerate(batch)]
+        prompt = (
+            "Translate these Persian transcript segments to natural English.\n"
+            "Return ONLY a JSON array of translated strings, same count and order.\n"
+            "Keep natural spoken style, not formal. No explanations.\n\n"
+            "Segments:\n" + '\n'.join(lines)
+        )
+        try:
+            raw = await chat([{"role": "user", "content": prompt}], temperature=0.2, max_tokens=4096)
+            translations = _parse_json(raw)
+            if isinstance(translations, list) and len(translations) == len(batch):
+                for j, text in enumerate(translations):
+                    if isinstance(text, str) and text.strip():
+                        results[batch_start + j] = {**results[batch_start + j], 'text': text.strip()}
+        except Exception as exc:
+            log.warning("translate_to_english batch %d: %s", batch_start, exc)
+    return results
+
+
 async def diarize_speakers(segments: list, title: str = '') -> dict:
     """
     LLM speaker diarization. Returns:
@@ -727,6 +754,8 @@ async def generate_artwork(title: str, summary_fa: str, thumbnail_url: str = '',
 async def _gemini_image_from_thumbnail(title: str, summary_fa: str,
                                        image_b64: str, image_mime: str) -> str:
     """Ask Gemini to create artwork inspired by the thumbnail image."""
+    if not IMAGE_URL:
+        return ''
     url = IMAGE_URL.rstrip('/') + '/images/generations'
     prompt = (
         f"Create a visually striking thumbnail artwork for media titled: {title}\n"
@@ -755,6 +784,8 @@ async def _gemini_image_from_thumbnail(title: str, summary_fa: str,
 
 async def _gemini_image_from_text(title: str, summary_fa: str) -> str:
     """Generate artwork from summary text using Gemini image model."""
+    if not IMAGE_URL:
+        return ''
     url = IMAGE_URL.rstrip('/') + '/images/generations'
     prompt = (
         f"Create a visually striking thumbnail artwork for: {title}\n"

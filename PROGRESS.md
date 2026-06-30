@@ -180,32 +180,32 @@ Neither GPT-4o-Transcribe nor Whisper-1 returns speaker labels. LLM post-process
 - Deferred until core bekhan is stable
 - Planned: browser extension that POSTs URL to `/api/import` with BEKHAN_SECRET header
 
-### Multi-language Transcript
-- DB supports `language` column on `transcript_segments` — can store `fa` + `en` separately
-- UI only shows `fa` currently
-- No translation task in pipeline yet
+### ✅ Multi-language Transcript (session 3 — done)
+- [x] `ai_client.py`: `translate_to_english(segments)` — batches of 100, LLM translates FA→EN
+- [x] `tasks.py`: `translate_item` — opt-in via `"translate": true` in model_config; saves `en` segments
+- [x] `api.py`: added to all 3 pipeline chains; `translate`/`asr_dual` boolean flags in model-config
+- [x] Frontend: FA/EN toggle in transcript toolbar; `setTrLang()` fetches + caches EN; helpful message when unavailable
 
-### Playlist / Bulk Import
-- No bulk import from YouTube channel or Aparat profile
-- Would use yt-dlp `--flat-playlist` to enumerate, then queue each URL
+### ✅ Bulk Import (session 3 — done)
+- [x] Import page textarea: one URL per line, `importBulk()` processes sequentially, shows ✓/✗ per URL
+
+### ✅ Collections & Tags Management UI (session 3 — done)
+- [x] Viewer: editable chips — collections (green) + tags (blue); × remove, input+Enter add; ✎ toggle
+- [x] Admin: مجموعه‌ها + برچسب‌ها grids with counts; click → filter library
+
+### ✅ AI Q&A on Player (session 3 — done)
+- [x] Sidebar panel 💬; scrolling chat history; calls `POST /api/items/{id}/ask`; gold/surface message bubbles
 
 ---
 
 ## 🔴 Not Done / Pending
 
-### ✅ Collections & Tags Management UI (session 3 — done)
-- [x] Viewer: editable chips row — collections (green) + tags (blue); × to remove, input + Enter to add; ✎ toggle edit mode
-- [x] `PATCH /api/items/{id}` used for all changes (already existed)
-- [x] Admin: مجموعه‌ها and برچسب‌ها grids with per-item counts; click → filter library
-- [x] `STEP_NAMES` now includes `diarize → گویندگان`
-
-### Search — Semantic / AI Q&A
-- Current search: SQLite `LIKE` fulltext on segments + titles
-- Planned: embedding-based vector search + "ask a question about this media" feature
+### Search — Semantic
+- Current: SQLite `LIKE` fulltext
+- Planned: embedding-based vector search
 
 ### Aparat Subtitles
-- yt-dlp fetches Aparat subtitles if available
-- No manual subtitle upload UI
+- yt-dlp fetches if available; no manual subtitle upload UI
 
 ---
 
