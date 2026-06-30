@@ -1,0 +1,10 @@
+data/
+.env
+.apikey
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+*.db
+*.db-shm
+*.db-wal

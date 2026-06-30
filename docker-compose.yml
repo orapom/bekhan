@@ -1,0 +1,78 @@
+services:
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build: backend
+    command: uvicorn api:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+      - ./frontend:/frontend
+      - ./.env:/secrets/.env:ro
+      - ./.apikey:/secrets/.apikey:ro
+    environment:
+      PYTHONPATH:    /app
+      REDIS_URL:     redis://redis:6379/0
+      DB_PATH:       /data/bekhan.db
+      MEDIA_DIR:     /data/media
+      AUDIO_DIR:     /data/audio
+      FRONTEND_DIR:  /frontend
+      API_URLS_FILE: /secrets/.env
+      API_KEY_FILE:  /secrets/.apikey
+      BEKHAN_SECRET: ""
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: backend
+    command: celery -A tasks worker --loglevel=info --concurrency=2 -Q celery
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+      - ./.env:/secrets/.env:ro
+      - ./.apikey:/secrets/.apikey:ro
+    environment:
+      PYTHONPATH:    /app
+      REDIS_URL:     redis://redis:6379/0
+      DB_PATH:       /data/bekhan.db
+      MEDIA_DIR:     /data/media
+      AUDIO_DIR:     /data/audio
+      API_URLS_FILE: /secrets/.env
+      API_KEY_FILE:  /secrets/.apikey
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  flower:
+    build: backend
+    command: celery -A tasks flower --port=5555 --url_prefix=flower
+    restart: unless-stopped
+    ports:
+      - "5556:5555"
+    volumes:
+      - ./.env:/secrets/.env:ro
+      - ./.apikey:/secrets/.apikey:ro
+    environment:
+      REDIS_URL:     redis://redis:6379/0
+      DB_PATH:       /data/bekhan.db
+      API_URLS_FILE: /secrets/.env
+      API_KEY_FILE:  /secrets/.apikey
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  redis_data:
