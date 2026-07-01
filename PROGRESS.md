@@ -264,31 +264,49 @@ Tested all features on Aparat item `a0c94668` (41-min multi-speaker video, full 
 
 ## 🔴 Not Done / Pending
 
-### Search — Semantic / Backend
-- Current: client-side filter + transcript cache; no `/api/search` backend endpoint
-- Planned: SQLite FTS or embedding-based vector search
+### Benchmark / Model Comparison Page (high priority)
+- Dedicated page: run a fixed ~10-min Aparat video through each ASR model (and param combos), then LLM tasks
+- Show speed + quality comparison; use best LLM to grade quality
+- Test different ASR params (temperature, prompt, timestamps granularity); document tradeoffs
+- Sample video: `https://www.aparat.com/v/fgk23zg`
 
 ### Aparat Quality Selection
-- yt-dlp fetches best quality by default; no UI to choose quality level
+- yt-dlp currently fetches best quality; no UI to choose
+- Should: default to max quality; let user pick from available formats in Add page
 
-### Book mode karaoke sync
-- Book mode does chapter-level sync only; segment-level karaoke within book mode not implemented
+### Book Mode Karaoke Sync (کتابچه)
+- Book mode shows paragraphs but no segment-level highlight
+- Should: highlight current word/segment while playing, synced to audio position
 
-### Benchmark / Model Comparison Page
-- User-requested: dedicated page to compare models on speed and quality
-- Need: standard test audio/text, run multiple models, compare output
+### Mini-Player: Current Text + Section
+- Bottom mini-player shows title + thumbnail only
+- Should: show current segment text (scrolling) + current chapter title
+
+### AI-Generated Title / Description / Image
+- Import currently uses yt-dlp metadata title as-is
+- Should: AI generates better Persian title, description, and selects/generates thumbnail based on content
+
+### Search — Backend / Semantic
+- Current search: client-side filter + transcript segment cache
+- Planned: SQLite FTS5 or embedding-based vector search via `/api/search`
 
 ### Database Backup
-- No git/S3 backup for `data/` volume
+- No backup for `/data/` volume (bekhan.db + media + audio)
+- Planned: periodic git push or S3 sync
 
-### Aparat Subtitles
-- yt-dlp fetches if available; no manual subtitle upload UI
+### Dual-Model Transcription for Low-Quality Audio
+- ASR Dual (already implemented) runs 2 models and LLM merges
+- Enhancement: auto-detect low-quality audio → force dual mode; tune merge prompt
 
 ### YouTube (deferred)
-- SSL/network blocked in Docker container; user will fix VPN
+- SSL `UNEXPECTED_EOF_WHILE_READING` from Docker; network/VPN issue
+- Fix: run Docker on machine with clean outbound TLS
 
 ### Chrome Extension (deferred)
-- Planned: browser extension that POSTs URL to `/api/import`
+- Planned: browser extension POSTs URL to `/api/import` with BEKHAN_SECRET header
+
+### Aparat Subtitles
+- yt-dlp fetches subs if available; no manual upload UI
 
 ---
 
@@ -377,50 +395,3 @@ MODEL_URLS={"DeepSeek-V3.2": "...", "Whisper-1": "...", ...}
 ```
 
 API key goes in `.apikey` (single line).
-
-
-added extra todos:
-
-for some videos i want to use both transcribe models and then merge the result with ai to get a better result, for medias with lower quality or when a person isnt promouncing everytging very good.
-
-for testing models, i want you to create a comperhensive test, run a sample 10 minute video from aparat like this:
-https://www.aparat.com/v/fgk23zg
-and compare transcribe with each model, or both models, then other parts like summary and stuff, everything 
-i want to see comparison in speed and quality, use best model you have for evaluating quality
-
-i think maybe event different configurations for models should be tested, for transcribe, there are alot of parameters i think, i want to use best params for best result in transcribe, even use both models if needed. i want to know what are downsides of using better params
-
-
-i would like to see progress for different tasks in processing, percentage per task if possible, i would like transcribtions to be in batches and in parallel to be faster. small chunks, parallel, and show progress in both admin page and the media page. crop on smart places if possible. like in silences. i want to see progress of everything and the models used in both media page and admin page very clearly
-
-i would also like sectioning of video and audios like in youtube. its already present in سرفصل ها but i want to see the same thing on player also.
-
-i also want to see what percentage of the media is about each topic
-
-
-summary should be really summaty not an intro. like a half pager like someone is telling me what is in the media
-
-
-prompts shpuld be configurable in admin panel too
-
-
-a comperhensive benchmark page is needed 
-
-
-aparat videos are low quality while aparat has seceral qualities and you should use max quality and i should be able to choose between differnet qualities
-
-the part کتابچه should be kareoky too, current word highkughted and synced.
-
-
-it seems models are not working as i expected. for each task, i want you to create a default input text or sound, long enough, compare different models with different params and put this benchmark in a specific page to see how are models actually working and compare quality and speed
-
-
-
-database should be backedup in git or s3
-
-
-
-the little player on bottom should show current text with higlights too and also header of current section
-
-
-title and description and image should be generated based on original title and image and decstiption and content of media extracted by AI
