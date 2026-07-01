@@ -50,7 +50,7 @@ Personal media archive. Single-user. RTL Persian UI. FastAPI + Celery + SQLite +
 - [x] LLM tasks: `correct_transcript_segments`, `generate_book_paragraphs`, `summarize_fa`, `extract_mentions`, `generate_infographic`, `mark_sacred_segments`, `mark_external_quotes`, `generate_artwork`
 
 ### Pipeline (`tasks.py`)
-Order: `import → transcribe → correct → paragraphs → summarize → mentions → infographic → sacred → quotes → artwork → done`
+Order: `import → transcribe → correct → translate (opt-in) → diarize → paragraphs → summarize → mentions → infographic → sacred → quotes → artwork → done`
 
 - [x] `import_url`: yt-dlp metadata + audio download + subtitle extraction (→ transcript if available)
 - [x] `import_upload`: ffmpeg video→audio extraction, ffprobe duration
@@ -215,6 +215,53 @@ Neither GPT-4o-Transcribe nor Whisper-1 returns speaker labels. LLM post-process
 
 ---
 
+## ✅ Done (session 5 — full UI test + bug fixes)
+
+### Browser Test Results (Playwright)
+
+Tested all features on Aparat item `a0c94668` (41-min multi-speaker video, full pipeline done):
+
+| Feature | Result | Notes |
+|---------|--------|-------|
+| Home page grid | ✅ | Thumbnails, type chips, status badges |
+| Player — Aparat HLS | ✅ | Loads, plays |
+| Chapter strip (سرفصل‌ها) click-to-seek | ✅ | Clicked ch2 → jumped to 711s |
+| Speaker legend (A/B/C) | ✅ | 3 speakers correctly identified |
+| Karaoke mode with speaker chips | ✅ | Speaker label shown on change |
+| EN toggle → "enable translate" hint | ✅ | Correct message when no EN segs |
+| Book mode (کتابچه) paragraphs | ✅ | Multi-paragraph view, click-to-seek |
+| Q&A — player sidebar | ✅ | Correct AI answer; markdown now renders bold |
+| Search + transcript expansion | ✅ | Found خروج از بدن in transcript |
+| Light/dark mode toggle | ✅ | Switches cleanly |
+| Add page — single URL | ✅ | Input + افزودن button |
+| Add page — file dropzone | ✅ | Drag & drop, MP4/WAV/etc |
+| Add page — bulk import | ✅ | Textarea, وارد کردن همه button |
+| Add page — processing queue | ✅ | Live items with status chips |
+| Admin — pipeline stats bars | ✅ | Per-step counts + model used |
+| Admin — model config (LLM/ASR) | ✅ | Reorder ▲▼, add, × remove |
+| Admin — auto-translate checkbox | ✅ | Toggle visible and correct |
+| Admin — ASR Dual checkbox | ✅ | Toggle visible |
+| Admin — AI prompt editors | ✅ | All 6 task prompts editable |
+| Admin — collections/tags grids | ✅ | Chips with counts |
+| Admin — items table | ✅ | All items with status, duration |
+| Editable chips (✎ toggle) | ✅ | × remove, add inputs, ✓ close |
+| Breadcrumb navigation | ✅ | خانه › آزمایش › تست صوتی |
+| Waveform — audio items | ✅ | 80 bars built from segments |
+| Waveform — video items | ✅ | Correctly hidden (uses native player) |
+| Audio artwork | ✅ | AI-generated SVG shown |
+
+### Bug Fixes (session 5)
+
+- [x] Q&A answer: `**bold**` rendered as asterisks — added `mdRender()`, switched to `innerHTML`
+- [x] Player `_dur` not reset in `destroy()` — stale 41:30 shown when switching to 2s audio — fixed: `this._dur = 0` in destroy
+
+### Diarize Verified End-to-End
+- Test item: 2140 segments, 3 speakers: A=خانم قنواتی (میهمان), B=مجری, C=خانم قنواتی (راوی اصلی تجربه)
+- 2139/2140 segments got speaker labels
+- Speaker legend appears in karaoke view when multi-speaker
+
+---
+
 ## 🔴 Not Done / Pending
 
 ### Search — Semantic / Backend
@@ -373,3 +420,7 @@ database should be backedup in git or s3
 
 
 
+the little player on bottom should show current text with higlights too and also header of current section
+
+
+title and description and image should be generated based on original title and image and decstiption and content of media extracted by AI

@@ -830,6 +830,7 @@ const Player = {
     if (this._el) { this._el.pause(); this._el.src = ''; }
     this._el = null;
     this._type = null;
+    this._dur = 0;
   },
 
   seek_click(e) {
@@ -1695,7 +1696,7 @@ async function doAsk() {
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({question: q})
     }).then(r => r.json());
-    ansEl.textContent = data.answer || 'پاسخی یافت نشد';
+    ansEl.innerHTML = mdRender(data.answer || 'پاسخی یافت نشد');
   } catch (e) {
     ansEl.textContent = 'خطا در دریافت پاسخ';
   }
@@ -2133,6 +2134,13 @@ function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function mdRender(s) {
+  return esc(s||'')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>');
+}
+
 function fmtTime(s) {
   s = s || 0;
   const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = Math.floor(s%60);
@@ -2186,7 +2194,7 @@ async function doPlayerAsk() {
       body: JSON.stringify({question: q}),
     }).then(r => r.json());
     typing.className = 'ask-msg ask-a';
-    typing.textContent = data.answer || '';
+    typing.innerHTML = mdRender(data.answer || '');
   } catch(e) {
     typing.className = 'ask-msg ask-err';
     typing.textContent = 'خطا: ' + (e.message || '');
