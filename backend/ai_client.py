@@ -120,53 +120,179 @@ def _get_duration(audio_path: str) -> float:
     return float(r.stdout.strip() or '0') or 3600.0
 
 
-def _detect_silences(audio_path: str) -> list:
+_CHUNKING_DEFAULTS = {
+    'algorithm': 'adaptive',   # 'fixed' | 'adaptive'
+    'fixed_db': -35,           # used when algorithm == 'fixed': absolute dBFS floor
+    'percentile': 10,          # used when algorithm == 'adaptive': Nth percentile of this file's own dB curve
+    'min_silence_dur': 0.5,
+    'max_drift_sec': 60,
+    'overlap_sec': 3,
+    'max_mb': 19,
+}
+
+
+def _chunking_config_path() -> str:
+    return os.path.join(os.path.dirname(os.getenv('DB_PATH', '/data/bekhan.db')), 'chunking_config.json')
+
+
+def chunking_config() -> dict:
+    try:
+        with open(_chunking_config_path()) as f:
+            cfg = json.load(f)
+        return {**_CHUNKING_DEFAULTS, **cfg}
+    except Exception:
+        return dict(_CHUNKING_DEFAULTS)
+
+
+def save_chunking_config(cfg: dict) -> dict:
+    path = _chunking_config_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    merged = {**_CHUNKING_DEFAULTS, **cfg}
+    with open(path, 'w') as f:
+        json.dump(merged, f, ensure_ascii=False, indent=2)
+    return merged
+
+
+def _read_pcm_mono(audio_path: str, sr: int = 4000):
+    """Decode to raw mono PCM at a low sample rate — plenty of resolution for
+    a silence/loudness envelope, and keeps the array small even for long
+    recordings (a 2-hour file is ~28MB of int16 at 4kHz)."""
     import subprocess
+    import numpy as np
     r = subprocess.run(
-        ['ffmpeg', '-i', audio_path, '-af', 'silencedetect=n=-35dB:d=0.5', '-f', 'null', '-'],
-        capture_output=True, text=True, timeout=180,
+        ['ffmpeg', '-v', 'error', '-i', audio_path, '-f', 's16le', '-acodec', 'pcm_s16le',
+         '-ac', '1', '-ar', str(sr), '-'],
+        capture_output=True, timeout=300,
     )
-    mids = []
-    t_start = None
-    for line in r.stderr.split('\n'):
-        ms = re.search(r'silence_start: ([\d.]+)', line)
-        if ms:
-            t_start = float(ms.group(1))
-        me = re.search(r'silence_end: ([\d.]+)', line)
-        if me and t_start is not None:
-            mids.append((t_start + float(me.group(1))) / 2.0)
-            t_start = None
-    return mids
+    return np.frombuffer(r.stdout, dtype=np.int16), sr
 
 
-def _split_audio_chunks(audio_path: str, max_mb: float = 19.0, overlap_sec: float = 3.0) -> list:
-    import subprocess, tempfile, math
-    size_mb = os.path.getsize(audio_path) / (1024 * 1024)
-    if size_mb <= max_mb:
-        dur = _get_duration(audio_path)
-        return [(audio_path, 0.0, dur)]
+def _db_curve(audio_path: str, window_sec: float = 0.2, sr: int = 4000) -> list:
+    """RMS-dBFS envelope of the whole file: [(t_mid, db), ...]. This is the
+    actual 'volume over time' of the recording, used both to draw a waveform
+    chart and to decide where silence is."""
+    import numpy as np
+    samples, sr = _read_pcm_mono(audio_path, sr)
+    win = max(1, int(window_sec * sr))
+    n = len(samples) // win
+    floor_db = -90.0
+    curve = []
+    for i in range(n):
+        chunk = samples[i * win:(i + 1) * win].astype(np.float64)
+        rms = float(np.sqrt(np.mean(chunk ** 2))) if len(chunk) else 0.0
+        db = 20 * np.log10(rms / 32768.0) if rms > 1e-6 else floor_db
+        curve.append((round(i * window_sec + window_sec / 2, 2), round(max(db, floor_db), 1)))
+    return curve
 
-    total_dur = _get_duration(audio_path)
-    n_chunks = math.ceil(size_mb / max_mb)
+
+def _silences_from_curve(curve: list, threshold_db: float, min_dur: float, window_sec: float) -> list:
+    """Merge consecutive below-threshold windows of the dB curve into (start, end) silence intervals."""
+    intervals = []
+    start = None
+    last_t = 0.0
+    for t, db in curve:
+        last_t = t
+        if db <= threshold_db:
+            if start is None:
+                start = t - window_sec / 2
+        else:
+            if start is not None:
+                end = t - window_sec / 2
+                if end - start >= min_dur:
+                    intervals.append((round(start, 2), round(end, 2)))
+                start = None
+    if start is not None:
+        end = last_t + window_sec / 2
+        if end - start >= min_dur:
+            intervals.append((round(start, 2), round(end, 2)))
+    return intervals
+
+
+def detect_silences_v2(audio_path: str, algorithm: str = 'adaptive', fixed_db: float = -35,
+                        percentile: float = 10, min_dur: float = 0.5,
+                        window_sec: float = 0.2) -> dict:
+    """Unified silence detection, used by BOTH production chunk-splitting and
+    the admin waveform test lab — so what gets tested is exactly what runs.
+
+    'fixed': anything quieter than fixed_db (dBFS) counts as silence — the
+    same absolute volume for every file, regardless of how it was recorded.
+
+    'adaptive': the threshold is derived from *this file's own* loudness
+    distribution (the Nth percentile of its dB curve). A quiet phone
+    recording and a loud studio recording don't share a meaningful silence
+    floor, so this re-derives 'quiet, for this file' every time instead of
+    assuming one fixed dB works everywhere."""
+    import numpy as np
+    curve = _db_curve(audio_path, window_sec=window_sec)
+    if not curve:
+        return {'curve': [], 'threshold_db': fixed_db, 'silences': []}
+    if algorithm == 'adaptive':
+        db_values = np.array([d for _, d in curve])
+        threshold = float(np.percentile(db_values, percentile))
+    else:
+        threshold = float(fixed_db)
+    silences = _silences_from_curve(curve, threshold, min_dur, window_sec)
+    return {'curve': curve, 'threshold_db': round(threshold, 1), 'silences': silences}
+
+
+def _pick_cut_point(target: float, silences: list, used: list, max_drift: float = 60.0):
+    """Pick the best silence midpoint near `target` for a chunk boundary.
+    Prefers the *widest* silence interval within max_drift seconds of the
+    target (a wider gap means we're more confidently between words, not
+    clipping speech), then the closest one on ties. Never reuses a point
+    already claimed by an earlier boundary (avoids zero-length/overlapping
+    chunks when two targets snap to the same gap). Falls back to a hard cut
+    at `target` if nothing suitable is nearby.
+    Returns (time, snapped_to_silence: bool)."""
+    candidates = []
+    for s, e in silences:
+        mid = (s + e) / 2.0
+        if abs(mid - target) > max_drift:
+            continue
+        if any(abs(mid - u) < 1.0 for u in used):
+            continue
+        candidates.append((e - s, -abs(mid - target), mid))
+    if not candidates:
+        return target, False
+    candidates.sort(reverse=True)
+    return candidates[0][2], True
+
+
+def _compute_chunk_boundaries(total_dur: float, n_chunks: int, silences: list,
+                               max_drift: float = 60.0) -> list:
+    """Compute the n_chunks+1 boundary points (0, ..., total_dur) for splitting
+    audio into n_chunks pieces, snapping internal boundaries to nearby silence
+    where possible. Returns a list of dicts: {time, snapped, target, drift_sec}."""
     target_dur = total_dur / n_chunks
-    silences = _detect_silences(audio_path)
-
-    boundaries = [0.0]
+    used = [0.0]
+    boundaries = [{'time': 0.0, 'snapped': None, 'target': 0.0, 'drift_sec': 0.0}]
     for i in range(1, n_chunks):
         target = i * target_dur
-        if silences:
-            nearest = min(silences, key=lambda t: abs(t - target))
-            boundaries.append(nearest if abs(nearest - target) <= 60.0 else target)
-        else:
-            boundaries.append(target)
-    boundaries.append(total_dur)
+        point, snapped = _pick_cut_point(target, silences, used, max_drift)
+        used.append(point)
+        boundaries.append({'time': point, 'snapped': snapped, 'target': round(target, 2),
+                            'drift_sec': round(point - target, 2)})
+    # Enforce strictly increasing order — snapping could in rare cases produce
+    # an out-of-order point if two nearby targets both want the same gap and
+    # the 1s de-dup above wasn't enough (e.g. very short chunks).
+    for i in range(1, len(boundaries)):
+        if boundaries[i]['time'] <= boundaries[i - 1]['time']:
+            boundaries[i]['time'] = boundaries[i - 1]['time'] + 1.0
+            boundaries[i]['snapped'] = False
+    boundaries.append({'time': total_dur, 'snapped': None, 'target': round(total_dur, 2), 'drift_sec': 0.0})
+    return boundaries
 
+
+def _cut_chunks_at_boundaries(audio_path: str, boundaries: list, total_dur: float,
+                               overlap_sec: float) -> list:
+    import subprocess, tempfile
+    n = len(boundaries) - 1
     tmpdir = tempfile.mkdtemp()
     chunks = []
-    for i in range(len(boundaries) - 1):
+    for i in range(n):
         nom_start, nom_end = boundaries[i], boundaries[i + 1]
         actual_start = max(0.0, nom_start - (overlap_sec if i > 0 else 0.0))
-        actual_end = min(total_dur, nom_end + (overlap_sec if i < n_chunks - 1 else 0.0))
+        actual_end = min(total_dur, nom_end + (overlap_sec if i < n - 1 else 0.0))
         out = os.path.join(tmpdir, f'chunk_{i:03d}.mp3')
         subprocess.run([
             'ffmpeg', '-y', '-ss', str(actual_start), '-to', str(actual_end),
@@ -176,21 +302,118 @@ def _split_audio_chunks(audio_path: str, max_mb: float = 19.0, overlap_sec: floa
     return chunks
 
 
+def _split_audio_chunks(audio_path: str, max_mb: float = 19.0, overlap_sec: float = 3.0,
+                         force_chunks: int | None = None) -> list:
+    """Production chunk-splitting. Reads the persisted chunking config
+    (algorithm/threshold/etc, settable in the admin برش صدا page) so what's
+    tuned and tested there is exactly what runs for real transcription."""
+    import math
+    size_mb = os.path.getsize(audio_path) / (1024 * 1024)
+    total_dur = _get_duration(audio_path)
+    if not force_chunks and size_mb <= max_mb:
+        return [(audio_path, 0.0, total_dur)]
+
+    cfg = chunking_config()
+    n_chunks = force_chunks if (force_chunks and force_chunks > 1) else max(2, math.ceil(size_mb / max_mb))
+    det = detect_silences_v2(audio_path, algorithm=cfg['algorithm'], fixed_db=cfg['fixed_db'],
+                              percentile=cfg['percentile'], min_dur=cfg['min_silence_dur'])
+    boundaries = [b['time'] for b in _compute_chunk_boundaries(total_dur, n_chunks, det['silences'],
+                                                                max_drift=cfg['max_drift_sec'])]
+    return _cut_chunks_at_boundaries(audio_path, boundaries, total_dur, overlap_sec)
+
+
+def analyze_and_split_for_test(audio_path: str, max_mb: float = 19.0, overlap_sec: float = 3.0,
+                                force_chunks: int | None = None,
+                                algorithm: str | None = None, fixed_db: float | None = None,
+                                percentile: float | None = None, min_silence_dur: float | None = None,
+                                max_drift_sec: float | None = None) -> dict:
+    """Used by the admin chunking test lab: actually cuts the audio (same
+    cutting code as production) with whichever algorithm/threshold is passed
+    in (defaults to the persisted config, but any param can be overridden for
+    experimentation without saving), and returns the resulting chunk file
+    paths plus the full dB curve + detected silences for charting."""
+    import math
+    cfg = chunking_config()
+    algorithm = algorithm or cfg['algorithm']
+    fixed_db = cfg['fixed_db'] if fixed_db is None else fixed_db
+    percentile = cfg['percentile'] if percentile is None else percentile
+    min_silence_dur = cfg['min_silence_dur'] if min_silence_dur is None else min_silence_dur
+    max_drift_sec = cfg['max_drift_sec'] if max_drift_sec is None else max_drift_sec
+
+    size_mb = os.path.getsize(audio_path) / (1024 * 1024)
+    total_dur = _get_duration(audio_path)
+    n_chunks = force_chunks if (force_chunks and force_chunks > 1) else max(2, math.ceil(size_mb / max_mb))
+
+    det = detect_silences_v2(audio_path, algorithm=algorithm, fixed_db=fixed_db,
+                              percentile=percentile, min_dur=min_silence_dur)
+    boundary_info = _compute_chunk_boundaries(total_dur, n_chunks, det['silences'], max_drift=max_drift_sec)
+    boundaries = [b['time'] for b in boundary_info]
+    chunk_paths = _cut_chunks_at_boundaries(audio_path, boundaries, total_dur, overlap_sec)
+
+    chunks = []
+    for i, (path, nom_start, nom_end) in enumerate(chunk_paths):
+        b = boundary_info[i]
+        chunks.append({
+            'idx': i,
+            'path': path,
+            'nom_start': round(nom_start, 2),
+            'nom_end': round(nom_end, 2),
+            'duration': round(nom_end - nom_start, 2),
+            'cut_snapped_to_silence': bool(b['snapped']) if i > 0 else None,
+            'drift_from_target_sec': b['drift_sec'] if i > 0 else 0.0,
+        })
+
+    # Downsample the dB curve for charting — a multi-hour file can have tens
+    # of thousands of 0.2s windows, far more than a chart needs.
+    curve = det['curve']
+    if len(curve) > 1500:
+        step = len(curve) // 1500 + 1
+        curve = curve[::step]
+
+    return {
+        'total_duration': round(total_dur, 2),
+        'n_chunks': n_chunks,
+        'algorithm': algorithm,
+        'threshold_db': det['threshold_db'],
+        'silences_detected': len(det['silences']),
+        'silences': det['silences'],
+        'db_curve': curve,
+        'chunks': chunks,
+    }
+
+
 async def _call_asr(url: str, model: str, audio_bytes: bytes, language: str,
-                   context_hint: str = '') -> list:
+                   context_hint: str = '', temperature: float | None = None,
+                   raise_on_fail: bool = False) -> list:
     auth = {"Authorization": f"Bearer {API_KEY}"}
     hint = context_hint[:200] if context_hint else ''
-    attempts = [
-        {'model': model, 'language': language, 'response_format': 'verbose_json',
-         'timestamp_granularities[]': 'word', 'prompt': hint},
-        {'model': model, 'language': language, 'response_format': 'verbose_json', 'prompt': hint},
-        {'model': model, 'language': language, 'response_format': 'verbose_json'},
-        {'model': model, 'language': language, 'response_format': 'json'},
-        {'model': model, 'response_format': 'verbose_json'},
-        {'model': model, 'response_format': 'json'},
-        {'model': model, 'language': language, 'response_format': 'text'},
-        {'model': model},
-    ]
+    temp = {'temperature': str(temperature)} if temperature is not None else {}
+    # Some gateway routes are model-scoped by URL and choke on a redundant
+    # 'model' field in the multipart body (seen with GPT-4o-Transcribe on
+    # ArvanCloud: any request that includes 'model' gets rejected upstream
+    # with "invalid content-type", while the identical request without it
+    # succeeds). Try each shape with 'model' first, then the same shape
+    # without it, so both gateway styles work without hardcoding per-model.
+    def _with_and_without_model(d: dict) -> list:
+        with_model = {'model': model, **d}
+        without_model = dict(d)
+        return [with_model, without_model]
+
+    attempts = []
+    for shape in [
+        {'language': language, 'response_format': 'verbose_json',
+         'timestamp_granularities[]': 'word', 'prompt': hint, **temp},
+        {'language': language, 'response_format': 'verbose_json', 'prompt': hint, **temp},
+        {'language': language, 'response_format': 'verbose_json', **temp},
+        {'language': language, 'response_format': 'json', **temp},
+        {'response_format': 'verbose_json', **temp},
+        {'response_format': 'json', **temp},
+        {'language': language, 'response_format': 'text', **temp},
+        {},
+    ]:
+        attempts.extend(_with_and_without_model(shape))
+    last_status = None
+    last_detail = None
     async with httpx.AsyncClient(timeout=600) as client:
         for params in attempts:
             fmt = params.get('response_format', 'json')
@@ -202,10 +425,17 @@ async def _call_asr(url: str, model: str, audio_bytes: bytes, language: str,
                     headers=auth,
                 ) as r:
                     if r.status_code >= 400:
+                        last_status = r.status_code
+                        try:
+                            last_detail = (await r.aread()).decode('utf-8', errors='replace')[:300]
+                        except Exception:
+                            last_detail = ''
                         continue
                     body = await r.aread()
             except Exception as exc:
                 log.warning("ASR %s error: %s", model, exc)
+                last_status = None
+                last_detail = str(exc)[:300]
                 continue
 
             ct = getattr(r, 'headers', {}).get('content-type', '')
@@ -239,6 +469,12 @@ async def _call_asr(url: str, model: str, audio_bytes: bytes, language: str,
             text = data.get('text', '')
             if text:
                 return [{'start': None, 'end': None, 'text': text.strip()}]
+
+    if raise_on_fail:
+        raise RuntimeError(
+            f"ASR '{model}' failed on all attempts"
+            + (f" (last status {last_status}): {last_detail}" if last_detail else "")
+        )
     return []
 
 
@@ -274,14 +510,25 @@ async def _transcribe_bytes(audio_bytes: bytes, language: str, context_hint: str
 
 
 async def _transcribe_bytes_single(audio_bytes: bytes, language: str,
-                                    model_key: str, context_hint: str = '') -> list:
-    """Transcribe with a specific model (no fallback chain)."""
+                                    model_key: str, context_hint: str = '',
+                                    temperature: float | None = None,
+                                    raise_on_fail: bool = False) -> list:
+    """Transcribe with a specific model (no fallback chain).
+    By default swallows failures and returns [] (used by production dual-mode,
+    where the caller already tolerates per-model failure). Pass
+    raise_on_fail=True to get a descriptive exception instead (used by the
+    admin ASR test lab, where you want to know *why* a model failed)."""
     if model_key not in MODEL_URLS:
+        if raise_on_fail:
+            raise RuntimeError(f"model '{model_key}' has no configured URL")
         return []
     model_id = _asr_model_id(model_key)
     url = MODEL_URLS[model_key].rstrip('/') + '/audio/transcriptions'
+    if raise_on_fail:
+        return await _call_asr(url, model_id, audio_bytes, language, context_hint,
+                               temperature, raise_on_fail=True)
     try:
-        return await _call_asr(url, model_id, audio_bytes, language, context_hint)
+        return await _call_asr(url, model_id, audio_bytes, language, context_hint, temperature)
     except Exception as exc:
         log.warning("_transcribe_bytes_single %s: %s", model_key, exc)
         return []
@@ -448,7 +695,8 @@ async def transcribe_audio_dual(audio_path: str, language: str = 'fa',
 
 # ── LLM pipeline steps ─────────────────────────────────────────────────────────
 
-async def correct_transcript_segments(segments: list, title: str = '', language: str = 'fa') -> list:
+async def correct_transcript_segments(segments: list, title: str = '', language: str = 'fa',
+                                       on_progress=None) -> list:
     if not segments:
         return segments
 
@@ -463,7 +711,8 @@ async def correct_transcript_segments(segments: list, title: str = '', language:
 
     BATCH = 120
     corrected = list(segments)
-    for batch_start in range(0, len(segments), BATCH):
+    n_batches = max(1, (len(segments) + BATCH - 1) // BATCH)
+    for bi, batch_start in enumerate(range(0, len(segments), BATCH)):
         batch = segments[batch_start: batch_start + BATCH]
         lines = [f"{i+1}. {s['text']}" for i, s in enumerate(batch)]
         prompt = f"{instr}\n\nSegments:\n{chr(10).join(lines)}"
@@ -476,10 +725,15 @@ async def correct_transcript_segments(segments: list, title: str = '', language:
                         corrected[batch_start + j] = {**corrected[batch_start + j], 'text': fix.strip()}
         except Exception as exc:
             log.warning("correct_transcript batch %d failed: %s", batch_start, exc)
+        if on_progress:
+            try:
+                on_progress(bi + 1, n_batches)
+            except Exception:
+                pass
     return corrected
 
 
-async def generate_book_paragraphs(segments: list, title: str = '') -> list:
+async def generate_book_paragraphs(segments: list, title: str = '', on_progress=None) -> list:
     if not segments:
         return []
 
@@ -508,7 +762,8 @@ async def generate_book_paragraphs(segments: list, title: str = '') -> list:
     )
 
     result = []
-    for chunk in chunks:
+    n_chunks = max(1, len(chunks))
+    for ci, chunk in enumerate(chunks):
         start_sec = chunk[0].get('start')
         end_sec = chunk[-1].get('end')
         raw_text = ' '.join(s.get('text', '').strip() for s in chunk)
@@ -532,6 +787,11 @@ async def generate_book_paragraphs(segments: list, title: str = '') -> list:
             log.warning("generate_book_paragraphs chunk failed: %s", exc)
             result.append({'title_fa': '', 'text_fa': raw_text,
                            'start_sec': start_sec, 'end_sec': end_sec})
+        if on_progress:
+            try:
+                on_progress(ci + 1, n_chunks)
+            except Exception:
+                pass
     return result
 
 
@@ -626,13 +886,14 @@ async def mark_sacred_segments(segments: list) -> list:
         return []
 
 
-async def translate_to_english(segments: list) -> list:
+async def translate_to_english(segments: list, on_progress=None) -> list:
     """Translate Persian/Arabic transcript segments to English."""
     if not segments:
         return segments
     BATCH = 100
     results = list(segments)
-    for batch_start in range(0, len(segments), BATCH):
+    n_batches = max(1, (len(segments) + BATCH - 1) // BATCH)
+    for bi, batch_start in enumerate(range(0, len(segments), BATCH)):
         batch = segments[batch_start: batch_start + BATCH]
         lines = [f"{i+1}. {s['text']}" for i, s in enumerate(batch)]
         prompt = (
@@ -650,10 +911,15 @@ async def translate_to_english(segments: list) -> list:
                         results[batch_start + j] = {**results[batch_start + j], 'text': text.strip()}
         except Exception as exc:
             log.warning("translate_to_english batch %d: %s", batch_start, exc)
+        if on_progress:
+            try:
+                on_progress(bi + 1, n_batches)
+            except Exception:
+                pass
     return results
 
 
-async def diarize_speakers(segments: list, title: str = '') -> dict:
+async def diarize_speakers(segments: list, title: str = '', on_progress=None) -> dict:
     """
     LLM speaker diarization. Returns:
     {is_multi_speaker, assignments: [{seg_index, speaker}], names: {A: ..., B: ...}}
@@ -665,8 +931,9 @@ async def diarize_speakers(segments: list, title: str = '') -> dict:
     all_assignments: list = []
     is_multi = False
     names: dict = {}
+    n_batches = max(1, (len(segments) + BATCH - 1) // BATCH)
 
-    for batch_start in range(0, len(segments), BATCH):
+    for bi, batch_start in enumerate(range(0, len(segments), BATCH)):
         batch = segments[batch_start: batch_start + BATCH]
         items = [{'i': s.get('seg_index', batch_start + j), 't': (s.get('text') or '').strip()}
                  for j, s in enumerate(batch)]
@@ -692,6 +959,11 @@ async def diarize_speakers(segments: list, title: str = '') -> dict:
             if first_batch:
                 is_multi = bool(data.get('is_multi_speaker', False))
             if not is_multi:
+                if on_progress:
+                    try:
+                        on_progress(n_batches, n_batches)  # single-speaker: nothing left to do
+                    except Exception:
+                        pass
                 break
             for a in (data.get('assignments') or []):
                 sp = a.get('sp', 'A')
@@ -701,6 +973,11 @@ async def diarize_speakers(segments: list, title: str = '') -> dict:
                 names.update(data['names'])
         except Exception as exc:
             log.warning("diarize_speakers batch %d: %s", batch_start, exc)
+        if on_progress:
+            try:
+                on_progress(bi + 1, n_batches)
+            except Exception:
+                pass
 
     return {'is_multi_speaker': is_multi, 'assignments': all_assignments, 'names': names}
 

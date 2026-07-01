@@ -12,6 +12,7 @@ MEDIA_EXTS = {'mp4', 'webm', 'mkv', 'avi', 'mov', 'flv', 'mp3', 'wav', 'ogg', 'm
 PLATFORM_PATTERNS = {
     'youtube': [r'youtube\.com', r'youtu\.be'],
     'aparat':  [r'aparat\.com'],
+    'telewebion': [r'telewebion\.com'],
     'vimeo':   [r'vimeo\.com'],
     'soundcloud': [r'soundcloud\.com'],
     'dailymotion': [r'dailymotion\.com'],
@@ -172,17 +173,36 @@ def _parse_srt(content: str) -> list[dict]:
     return segs
 
 
-def get_stream_url(url: str) -> str:
+def list_available_qualities(url: str) -> list[dict]:
+    """List distinct video resolutions available for this URL, for a quality picker.
+    Always includes a 'best' option first."""
+    import yt_dlp
+    ydl_opts = {'quiet': True, 'no_warnings': True}
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+    if not info:
+        return [{'value': 'best', 'label': 'بهترین کیفیت موجود'}]
+
+    formats = info.get('formats') or []
+    heights = sorted({
+        f['height'] for f in formats
+        if f.get('height') and f.get('vcodec') and f['vcodec'] != 'none'
+    }, reverse=True)
+
+    qualities = [{'value': 'best', 'label': 'بهترین کیفیت موجود'}]
+    for h in heights:
+        qualities.append({'value': str(h), 'label': f'{h}p'})
+    return qualities
+
+
+def get_stream_url(url: str, quality: str = 'best') -> str:
     """
-    Get a fresh direct stream URL (for Aparat + other HLS sources).
-    Prefers HLS/m3u8; falls back to best available URL.
+    Get a fresh direct stream URL (for Aparat + other HLS sources), matching
+    the requested quality tier (a max-height string like '720', or 'best').
+    Prefers HLS/m3u8 formats within that height; falls back to best available URL.
     """
     import yt_dlp
-    ydl_opts = {
-        'quiet': True,
-        'no_warnings': True,
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
-    }
+    ydl_opts = {'quiet': True, 'no_warnings': True}
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
 
@@ -190,9 +210,32 @@ def get_stream_url(url: str) -> str:
         return ''
 
     formats = info.get('formats') or []
-    for f in formats:
-        if f.get('protocol') in ('m3u8', 'm3u8_native', 'hls') and f.get('url'):
-            return f['url']
+    video_formats = [f for f in formats
+                     if f.get('url') and f.get('vcodec') and f['vcodec'] != 'none']
+
+    max_height = None
+    if quality and quality != 'best':
+        try:
+            max_height = int(quality)
+        except ValueError:
+            max_height = None
+
+    candidates = video_formats
+    if max_height:
+        within = [f for f in video_formats if (f.get('height') or 0) <= max_height]
+        candidates = within or video_formats  # fall back if nothing fits under the cap
+
+    if candidates:
+        # pick the highest height within the cap, preferring an HLS variant
+        # *at that height* (more seek-friendly for streaming) over a
+        # same-height progressive one — but never trade away height for protocol.
+        top_height = max(f.get('height') or 0 for f in candidates)
+        at_top = [f for f in candidates if (f.get('height') or 0) == top_height]
+        hls_at_top = [f for f in at_top if f.get('protocol') in ('m3u8', 'm3u8_native', 'hls')]
+        chosen = hls_at_top[0] if hls_at_top else at_top[0]
+        return chosen['url']
+
+    # No usable video formats — fall back to whatever's available
     for f in reversed(formats):
         if f.get('url'):
             return f['url']

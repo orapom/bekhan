@@ -115,10 +115,12 @@ main#ct{padding:1.6rem;min-width:0}
 .ch-mark:hover{opacity:1;width:3px}
 .ch-tip{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--line);padding:2px 6px;border-radius:3px;font-size:.6rem;white-space:nowrap;display:none;z-index:5;pointer-events:none}
 .ch-mark:hover .ch-tip{display:block}
-.pl-proc{background:var(--surf);border:1px solid var(--line);border-radius:var(--r);padding:.6rem .85rem;margin-bottom:.7rem}
-.proc-hd{font-size:.7rem;font-weight:600;color:var(--mu);margin-bottom:.35rem;font-family:var(--ff-ui)}
-.proc-row{display:flex;align-items:center;gap:.5rem;margin:.12rem 0}
-.proc-nm{font-size:.7rem;min-width:5.5rem;color:var(--tx)}
+.proc-overall{display:flex;justify-content:space-between;font-size:.72rem;color:var(--tx);margin-bottom:.3rem;font-family:var(--ff-ui)}
+.proc-overall-pct{color:var(--gold);font-family:var(--ff-mono);font-weight:700}
+.proc-bg-lg{height:6px;margin-bottom:.7rem}
+.proc-row{display:flex;align-items:center;gap:.5rem;margin:.28rem 0}
+.proc-row-active .proc-nm{color:var(--gold)}
+.proc-nm{font-size:.68rem;min-width:5rem;color:var(--tx)}
 .proc-bg{flex:1;height:4px;background:var(--line);border-radius:2px;overflow:hidden}
 .proc-bar{height:100%;background:var(--gold);border-radius:2px;transition:width .4s}
 .proc-bar.done{background:var(--ok)}
@@ -141,6 +143,18 @@ main#ct{padding:1.6rem;min-width:0}
 .chip-add-lbl{font-size:.6rem;color:var(--mu);font-family:var(--ff-ui);padding:.1rem .2rem}
 .edit-toggle{background:none;border:none;font-size:.65rem;color:var(--mu);cursor:pointer;padding:.1rem .3rem;font-family:var(--ff-ui);border-radius:.2rem}
 .edit-toggle:hover{color:var(--gold)}
+/* Settings tabs (Admin) */
+.set-tabs{display:flex;gap:.3rem;border-bottom:1px solid var(--line);margin-bottom:1.1rem;flex-wrap:wrap}
+.set-tab{background:none;border:none;color:var(--mu);font-family:var(--ff-fa);font-size:.85rem;padding:.55rem .9rem;cursor:pointer;border-bottom:2px solid transparent;transition:var(--tr)}
+.set-tab:hover{color:var(--tx)}
+.set-tab.on{color:var(--gold);border-bottom-color:var(--gold)}
+.asr-field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.6rem;margin-bottom:.5rem}
+.asr-field{font-size:.68rem;color:var(--mu);display:flex;flex-direction:column;gap:.25rem}
+.model-cap-row{display:flex;align-items:center;gap:.6rem;padding:.5rem .7rem;border:1px solid var(--line);border-radius:var(--r);margin-bottom:.4rem;flex-wrap:wrap}
+.model-cap-name{font-family:var(--ff-mono);font-size:.8rem;flex:1;min-width:140px}
+.model-cap-badge{font-size:.62rem;font-family:var(--ff-mono);padding:.15rem .5rem;border-radius:1em;border:1px solid var(--line);color:var(--mu)}
+.model-cap-badge.ok{color:var(--ok);border-color:var(--ok)}
+.model-cap-badge.err{color:var(--err);border-color:var(--err)}
 /* Admin collections/tags grid */
 .ctag-grid{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.8rem}
 .ctag-item{display:inline-flex;align-items:center;gap:.3rem;font-size:.72rem;padding:.2em .6em;border-radius:2em;background:var(--card);border:1px solid var(--line);cursor:pointer;transition:var(--tr)}
@@ -154,6 +168,8 @@ main#ct{padding:1.6rem;min-width:0}
 .bk-ts{font-size:.6rem;font-family:var(--ff-mono);color:var(--mu);flex-shrink:0}
 .bk-section.on .bk-title{color:var(--gold)}
 .bk-text{font-size:.9rem;line-height:2;color:var(--tx);white-space:pre-line}
+.bk-read{color:var(--tx)}
+.bk-unread{color:var(--mu)}
 .para{margin-bottom:1.1rem;padding-bottom:1rem;border-bottom:1px solid var(--line);border-right:2px solid transparent;padding-right:.3rem;transition:border-right-color .2s}
 .para:last-child{border-bottom:none}
 .para.hi{border-right-color:var(--gold)}
@@ -170,6 +186,19 @@ main#ct{padding:1.6rem;min-width:0}
 .sp-c{background:rgba(240,144,66,.2);color:#f09042}
 .sp-d{background:rgba(171,71,188,.2);color:#ab47bc}
 .sp-legend{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.6rem;padding:.4rem .5rem;background:var(--surf);border-radius:var(--r);border:1px solid var(--line)}
+/* script/play-style speaker turns (karaoke, multi-speaker) */
+.script-turn{margin-bottom:1.3rem;padding-bottom:1.1rem;border-bottom:1px solid var(--line)}
+.script-turn:last-child{border-bottom:none}
+.script-name{font-weight:700;font-size:.8rem;margin-bottom:.35rem;font-family:var(--ff-ui)}
+.script-ts{font-size:.6rem;font-family:var(--ff-mono);color:var(--mu);font-weight:400;margin-right:.4rem}
+.script-body{font-size:.9rem;line-height:2;word-break:break-word;color:var(--tx)}
+.script-seg{cursor:pointer;border-radius:.15em;transition:background .15s}
+.script-seg:hover{background:var(--hover)}
+.script-seg.hi{background:var(--gold2)}
+.spk-a .script-name,.spk-a .script-body{color:#7eb8f7}[data-theme=light] .spk-a .script-name,[data-theme=light] .spk-a .script-body{color:#2563eb}
+.spk-b .script-name,.spk-b .script-body{color:#4db6ac}
+.spk-c .script-name,.spk-c .script-body{color:#f09042}
+.spk-d .script-name,.spk-d .script-body{color:#ab47bc}
 .sp-leg-item{display:flex;align-items:center;gap:.3rem;font-size:.72rem;color:var(--mu)}
 .sum-block{margin-bottom:.9rem}
 .sum-ll{font-size:.62rem;font-family:var(--ff-ui);font-weight:700;color:var(--gold);letter-spacing:.09em;text-transform:uppercase;margin-bottom:.3rem}
@@ -268,7 +297,8 @@ mark{background:rgba(126,184,247,.25);color:var(--gold);border-radius:.15em}
 .mp-art{width:38px;height:38px;border-radius:.3rem;background:var(--card);overflow:hidden;flex-shrink:0}
 .mp-art img,.mp-art svg{width:100%;height:100%;object-fit:cover}
 .mp-info{flex:1;min-width:0}
-.mp-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.83rem;margin-bottom:.18rem}
+.mp-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.83rem;margin-bottom:.14rem}
+.mp-sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.68rem;color:var(--mu);margin-bottom:.18rem}
 .mp-prg-bg{height:2px;background:var(--line);border-radius:2px}
 .mp-prg-f{height:2px;background:var(--gold);border-radius:2px;width:0%;transition:width .3s linear}
 .mp-btns{display:flex;align-items:center;gap:.45rem;flex-shrink:0}
@@ -341,6 +371,15 @@ mark{background:rgba(126,184,247,.25);color:var(--gold);border-radius:.15em}
       <div id="pl-bc" class="pl-bc"></div>
       <div class="pl-wrap">
         <div class="pl-main">
+          <!-- title box — sits above the player so there's no gap between video and transcript -->
+          <div class="pl-hdr">
+            <div class="pl-thumb" id="pl-thumb"><span style="font-size:2rem;opacity:.3">▶</span></div>
+            <div class="pl-hinfo">
+              <div class="p-title" id="pl-title"></div>
+              <div class="p-meta-row" id="pl-meta"></div>
+              <div id="pl-chips"></div>
+            </div>
+          </div>
           <!-- video/audio area -->
           <div id="pl-video" class="pl-video">
             <div id="yt-player"></div>
@@ -352,17 +391,7 @@ mark{background:rgba(126,184,247,.25);color:var(--gold);border-radius:.15em}
           </div>
           <!-- chapter/timeline strip — clickable markers, doubles as progress bar -->
           <div id="ch-strip" class="ch-strip" style="display:none"></div>
-          <!-- pipeline processing status — visible while item is being processed -->
-          <div id="pl-proc" class="pl-proc" style="display:none"></div>
           <div class="p-ctrl">
-            <div class="pl-hdr">
-              <div class="pl-thumb" id="pl-thumb"><span style="font-size:2rem;opacity:.3">▶</span></div>
-              <div class="pl-hinfo">
-                <div class="p-title" id="pl-title"></div>
-                <div class="p-meta-row" id="pl-meta"></div>
-                <div id="pl-chips"></div>
-              </div>
-            </div>
             <!-- audio controls (hidden for youtube) -->
             <div id="pl-audio-ctrl" class="audio-row" style="display:none">
               <button class="btn-play" id="pl-play-btn" onclick="Player.toggle()">▶</button>
@@ -374,6 +403,11 @@ mark{background:rgba(126,184,247,.25);color:var(--gold);border-radius:.15em}
             </div>
             <div class="dl-row">
               <a id="dl-audio-btn" class="btn-dl" style="display:none" download><span class="dl-ic">↓</span> دانلود</a>
+              <button class="btn-dl" onclick="document.getElementById('sub-file-in').click()">
+                <span class="dl-ic">↥</span> آپلود زیرنویس
+              </button>
+              <input type="file" id="sub-file-in" accept=".srt,.vtt" style="display:none" onchange="uploadSubtitle(event)">
+              <select id="pl-quality" class="btn-dl" style="display:none" onchange="changeQuality(event)"></select>
             </div>
           </div>
           <!-- transcript -->
@@ -382,10 +416,6 @@ mark{background:rgba(126,184,247,.25);color:var(--gold);border-radius:.15em}
               <button class="tmbtn on" id="tm-karaoke" onclick="setTrMode('karaoke')">کاراوکه</button>
               <button class="tmbtn" id="tm-book" onclick="setTrMode('book')">کتابچه</button>
             </div>
-            <div style="display:flex;gap:.2rem;margin-right:auto">
-              <button class="tmbtn on" id="tm-lang-fa" onclick="setTrLang('fa')" title="فارسی">FA</button>
-              <button class="tmbtn" id="tm-lang-en" onclick="setTrLang('en')" title="English">EN</button>
-            </div>
           </div>
           <div class="tr-wrap" id="tr-wrap">
             <div class="msg ldots" id="tr-loading">در حال بارگذاری رونویسی</div>
@@ -393,6 +423,11 @@ mark{background:rgba(126,184,247,.25);color:var(--gold);border-radius:.15em}
         </div>
         <!-- Sidebar -->
         <div id="pl-sidebar">
+          <!-- pipeline processing status — visible while item is being processed -->
+          <div class="panel" id="pn-proc" style="display:none">
+            <div class="p-hd"><span class="p-hd-ic">◔</span>وضعیت پردازش</div>
+            <div class="p-bd" id="pl-proc"></div>
+          </div>
           <div class="panel" id="pn-ch">
             <div class="p-hd"><span class="p-hd-ic">≡</span>سرفصل‌ها</div>
             <div class="p-bd"><div class="ch-list" id="ch-list"><div class="msg" style="padding:.5rem">در انتظار پردازش</div></div></div>
@@ -450,6 +485,8 @@ mark{background:rgba(126,184,247,.25);color:var(--gold);border-radius:.15em}
       <div class="url-input-row">
         <input id="url-in" class="url-in" type="url" dir="ltr" placeholder="https://youtube.com/watch?v=... یا هر لینک رسانه‌ای"
                onkeydown="if(event.key==='Enter')importUrl()">
+        <select id="q-select" class="tmbtn" style="display:none"></select>
+        <button class="tmbtn" onclick="checkQualities()" title="بررسی کیفیت‌های موجود">کیفیت</button>
         <button class="btn-primary" onclick="importUrl()">+ افزودن</button>
       </div>
       <div class="dropzone" id="dropzone" onclick="document.getElementById('file-in').click()"
@@ -482,50 +519,205 @@ mark{background:rgba(126,184,247,.25);color:var(--gold);border-radius:.15em}
         <span class="ph-title">مدیریت</span>
         <span id="worker-ind" class="ph-meta"></span>
       </div>
-      <div class="ag" id="admin-stats"></div>
-      <div class="sec-lbl"><span class="sec-ic">◈</span>پیشرفت کلی پردازش</div>
-      <div id="admin-pipeline"></div>
 
-      <div class="sec-lbl" style="margin-top:1.4rem"><span class="sec-ic">⚙</span>پیکربندی مدل‌ها
-        <button class="tmbtn on" id="cfg-save-btn" onclick="saveModelConfig()" style="margin-right:auto;font-size:.7rem">ذخیره</button>
-        <button class="tmbtn" onclick="testModelsUI()" style="font-size:.7rem">آزمون مقایسه‌ای</button>
+      <div class="set-tabs" id="set-tabs">
+        <button class="set-tab on" data-tab="overview" onclick="settingsTab('overview')">نمای کلی</button>
+        <button class="set-tab" data-tab="models" onclick="settingsTab('models')">مدل‌ها</button>
+        <button class="set-tab" data-tab="chunking" onclick="settingsTab('chunking')">برش صدا</button>
+        <button class="set-tab" data-tab="asr" onclick="settingsTab('asr')">رونویسی ASR</button>
       </div>
-      <div id="model-cfg-wrap" style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem"></div>
 
-      <div id="model-test-wrap" style="display:none;margin-bottom:1rem">
-        <div class="panel">
-          <div class="p-hd"><span class="p-hd-ic">⚡</span>آزمون مدل‌ها</div>
-          <div class="p-bd">
-            <div style="display:flex;gap:.5rem;margin-bottom:.6rem;flex-wrap:wrap">
-              <input id="test-prompt" class="url-in" type="text" value="سلام، یک جمله کوتاه به فارسی بنویس." style="flex:1;font-size:.82rem;padding:.4rem .7rem">
-              <button class="btn-primary" onclick="runModelTest()" style="white-space:nowrap;font-size:.8rem">اجرا</button>
+      <!-- ── تب: نمای کلی ──────────────────────────────────────────────── -->
+      <div class="set-page" id="set-page-overview">
+        <div class="ag" id="admin-stats"></div>
+        <div class="sec-lbl"><span class="sec-ic">◈</span>پیشرفت کلی پردازش</div>
+        <div id="admin-pipeline"></div>
+
+        <div class="sec-lbl" style="margin-top:1.4rem"><span class="sec-ic">✍</span>دستورالعمل‌های هوش مصنوعی
+          <button class="tmbtn on" id="prompt-save-btn" onclick="savePromptConfig()" style="margin-right:auto;font-size:.7rem">ذخیره</button>
+          <button class="tmbtn" onclick="resetPromptConfig()" style="font-size:.7rem">پیش‌فرض</button>
+        </div>
+        <div id="prompt-cfg-wrap" style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem"></div>
+
+        <div class="sec-lbl" style="margin-top:1.4rem"><span class="sec-ic">🗂</span>مجموعه‌ها
+          <button class="tmbtn" onclick="nav('browse')" style="margin-right:auto;font-size:.7rem">مشاهده همه</button>
+        </div>
+        <div id="admin-colls" class="ctag-grid"></div>
+        <div class="sec-lbl" style="margin-top:.3rem"><span class="sec-ic">#</span>برچسب‌ها</div>
+        <div id="admin-tags" class="ctag-grid"></div>
+
+        <div class="sec-lbl" style="margin-top:.4rem"><span class="sec-ic">≡</span>آیتم‌ها</div>
+        <div style="overflow-x:auto">
+          <table class="ptab" id="admin-table">
+            <thead><tr>
+              <th>عنوان</th><th>منبع</th><th>وضعیت</th><th>مدت</th><th>افزوده‌شده</th><th></th>
+            </tr></thead>
+            <tbody id="admin-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── تب: مدل‌ها ────────────────────────────────────────────────── -->
+      <div class="set-page" id="set-page-models" style="display:none">
+        <div class="sec-lbl"><span class="sec-ic">⚙</span>ترتیب مدل‌های هوش مصنوعی (LLM)
+          <button class="tmbtn on" id="cfg-save-btn" onclick="saveModelConfig()" style="margin-right:auto;font-size:.7rem">ذخیره</button>
+          <button class="tmbtn" onclick="testModelsUI()" style="font-size:.7rem">آزمون مقایسه‌ای</button>
+        </div>
+        <div style="font-size:.68rem;color:var(--mu);margin-bottom:.6rem">ترتیب پشتیبان مدل ASR در تب «رونویسی ASR» است.</div>
+        <div id="model-cfg-wrap" style="display:grid;grid-template-columns:1fr;max-width:420px;gap:.75rem;margin-bottom:1rem"></div>
+
+        <div id="model-test-wrap" style="display:none;margin-bottom:1rem">
+          <div class="panel">
+            <div class="p-hd"><span class="p-hd-ic">⚡</span>آزمون مدل‌ها</div>
+            <div class="p-bd">
+              <div style="display:flex;gap:.5rem;margin-bottom:.6rem;flex-wrap:wrap">
+                <input id="test-prompt" class="url-in" type="text" value="سلام، یک جمله کوتاه به فارسی بنویس." style="flex:1;font-size:.82rem;padding:.4rem .7rem">
+                <button class="btn-primary" onclick="runModelTest()" style="white-space:nowrap;font-size:.8rem">اجرا</button>
+              </div>
+              <div id="test-results"></div>
             </div>
-            <div id="test-results"></div>
+          </div>
+        </div>
+
+        <div class="sec-lbl" style="margin-top:1.4rem"><span class="sec-ic">🔎</span>وارد کردن و آزمایش مدل‌ها
+          <span style="font-size:.65rem;font-weight:400;color:var(--mu)">هر مدل موجود روی درگاه — بدون فرض قبلی — روی چهار توانایی تست می‌شود</span>
+        </div>
+        <div style="font-size:.68rem;color:var(--mu);margin-bottom:.6rem">
+          برای هر مدل، درخواست واقعی به هر یک از چهار قابلیت زیر زده می‌شود و نتیجه واقعی (نه حدسی) نمایش داده می‌شود:
+          متن (chat/completions)، جاسازی متن (embeddings)، تولید تصویر (images/generations)، رونویسی صدا (audio/transcriptions).
+        </div>
+        <div id="model-capability-list"></div>
+      </div>
+
+      <!-- ── تب: برش صدا ───────────────────────────────────────────────── -->
+      <div class="set-page" id="set-page-chunking" style="display:none">
+        <div class="sec-lbl"><span class="sec-ic">⚙</span>تنظیمات برش
+          <button class="tmbtn on" id="chunk-cfg-save-btn" onclick="saveChunkingConfig()" style="margin-right:auto;font-size:.7rem">ذخیره</button>
+        </div>
+        <div class="panel" style="margin-bottom:1rem">
+          <div class="p-bd">
+            <div style="display:flex;gap:1.2rem;flex-wrap:wrap;margin-bottom:.7rem;font-size:.8rem">
+              <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
+                <input type="radio" name="chunk-algo" value="adaptive" id="chunk-algo-adaptive"> نسبی به خود فایل (پیشنهادی)
+              </label>
+              <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
+                <input type="radio" name="chunk-algo" value="fixed" id="chunk-algo-fixed"> آستانه دسی‌بل ثابت
+              </label>
+            </div>
+            <div style="font-size:.68rem;color:var(--mu);margin-bottom:.8rem">
+              <b>نسبی:</b> آستانهٔ سکوت از روی توزیع بلندی صدای همان فایل محاسبه می‌شود (چندمین صدک ساکت‌ترین بخش‌ها) — چون ضبط تلفن و ضبط استودیویی کف صدای متفاوتی دارند.
+              <b>ثابت:</b> هر چیزی زیر یک دسی‌بل مشخص، برای همهٔ فایل‌ها یکسان، سکوت حساب می‌شود.
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.6rem">
+              <label style="font-size:.68rem;color:var(--mu)">صدک سکوت (٪) — فقط نسبی
+                <input id="chunk-percentile" type="number" min="1" max="40" step="1" class="url-in" style="width:100%;font-size:.8rem;margin-top:.25rem">
+              </label>
+              <label style="font-size:.68rem;color:var(--mu)">آستانه دسی‌بل ثابت — فقط ثابت
+                <input id="chunk-fixed-db" type="number" min="-90" max="0" step="1" class="url-in" style="width:100%;font-size:.8rem;margin-top:.25rem">
+              </label>
+              <label style="font-size:.68rem;color:var(--mu)">حداقل مدت سکوت (ثانیه)
+                <input id="chunk-min-dur" type="number" min="0.1" max="5" step="0.1" class="url-in" style="width:100%;font-size:.8rem;margin-top:.25rem">
+              </label>
+              <label style="font-size:.68rem;color:var(--mu)">حداکثر انحراف از نقطهٔ هدف (ثانیه)
+                <input id="chunk-max-drift" type="number" min="5" max="300" step="5" class="url-in" style="width:100%;font-size:.8rem;margin-top:.25rem">
+              </label>
+              <label style="font-size:.68rem;color:var(--mu)">هم‌پوشانی بین قطعه‌ها (ثانیه)
+                <input id="chunk-overlap" type="number" min="0" max="15" step="0.5" class="url-in" style="width:100%;font-size:.8rem;margin-top:.25rem">
+              </label>
+              <label style="font-size:.68rem;color:var(--mu)">حداکثر حجم هر قطعه در تولید (MB)
+                <input id="chunk-max-mb" type="number" min="1" max="24" step="1" class="url-in" style="width:100%;font-size:.8rem;margin-top:.25rem">
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec-lbl"><span class="sec-ic">〰</span>آزمایش با نمودار موج/دسی‌بل
+          <span style="font-size:.65rem;font-weight:400;color:var(--mu)">نقاط برش روی نمودار بلندی صدا دیده می‌شوند؛ می‌توانید تنظیمات بالا را بدون ذخیره، اینجا امتحان کنید</span>
+        </div>
+        <div class="panel" style="margin-bottom:1rem">
+          <div class="p-bd">
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem">
+              <select id="chunk-item-sel" class="url-in" style="flex:2;min-width:220px;font-size:.78rem;padding:.4rem .6rem"></select>
+              <input id="chunk-n" type="number" value="4" min="2" max="30" step="1" title="تعداد قطعه‌ها"
+                     class="url-in" style="width:82px;font-size:.78rem;padding:.4rem .5rem">
+              <button class="btn-primary" id="chunk-run-btn" onclick="runChunkTest()" style="font-size:.8rem">اجرای آزمون برش</button>
+            </div>
+            <div style="font-size:.68rem;color:var(--mu);margin-bottom:.6rem">
+              فایل صوتی کامل آیتم انتخابی واقعاً بریده می‌شود — همان کدی که در تولید اجرا می‌شود، با تنظیمات بالا (بدون نیاز به ذخیره).
+            </div>
+            <div id="chunk-test-summary" style="font-size:.75rem;margin-bottom:.6rem"></div>
+            <div id="chunk-waveform-wrap" style="margin-bottom:.8rem"></div>
+            <div id="chunk-test-results"></div>
           </div>
         </div>
       </div>
 
-      <div class="sec-lbl" style="margin-top:.4rem"><span class="sec-ic">✍</span>دستورالعمل‌های هوش مصنوعی
-        <button class="tmbtn on" id="prompt-save-btn" onclick="savePromptConfig()" style="margin-right:auto;font-size:.7rem">ذخیره</button>
-        <button class="tmbtn" onclick="resetPromptConfig()" style="font-size:.7rem">پیش‌فرض</button>
-      </div>
-      <div id="prompt-cfg-wrap" style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem"></div>
+      <!-- ── تب: رونویسی ASR ───────────────────────────────────────────── -->
+      <div class="set-page" id="set-page-asr" style="display:none">
+        <div class="sec-lbl"><span class="sec-ic">⊕</span>ترتیب پشتیبان (Fallback) مدل‌های ASR
+          <button class="tmbtn on" id="asr-cfg-save-btn" onclick="saveModelConfig('asr-cfg-save-btn')" style="margin-right:auto;font-size:.7rem">ذخیره</button>
+        </div>
+        <div style="font-size:.68rem;color:var(--mu);margin-bottom:.6rem">
+          مدل اول امتحان می‌شود؛ اگر شکست خورد یا نتیجه‌ای برنگرداند، مدل بعدی در لیست جایگزین می‌شود.
+        </div>
+        <div id="asr-cfg-wrap" style="margin-bottom:1rem"></div>
 
-      <div class="sec-lbl" style="margin-top:1.4rem"><span class="sec-ic">🗂</span>مجموعه‌ها
-        <button class="tmbtn" onclick="nav('browse')" style="margin-right:auto;font-size:.7rem">مشاهده همه</button>
-      </div>
-      <div id="admin-colls" class="ctag-grid"></div>
-      <div class="sec-lbl" style="margin-top:.3rem"><span class="sec-ic">#</span>برچسب‌ها</div>
-      <div id="admin-tags" class="ctag-grid"></div>
+        <div class="sec-lbl" style="margin-top:1rem"><span class="sec-ic">🎙</span>آزمایشگاه رونویسی
+          <span style="font-size:.65rem;font-weight:400;color:var(--mu)">مقایسه مدل‌های ASR روی یک برش صوتی واقعی</span>
+        </div>
+        <div class="panel" style="margin-bottom:1rem">
+          <div class="p-bd">
+            <div class="asr-field-grid">
+              <label class="asr-field">آیتم برای آزمایش
+                <select id="asr-item-sel" class="url-in" style="width:100%;font-size:.78rem;padding:.4rem .6rem"></select>
+              </label>
+              <label class="asr-field">شروع برش (ثانیه)
+                <input id="asr-start" type="number" value="0" min="0" step="5" class="url-in" style="width:100%;font-size:.78rem;padding:.4rem .5rem">
+              </label>
+              <label class="asr-field">مدت برش (ثانیه، حداکثر ۱۸۰)
+                <input id="asr-dur" type="number" value="60" min="5" max="180" step="5" class="url-in" style="width:100%;font-size:.78rem;padding:.4rem .5rem">
+              </label>
+              <label class="asr-field">کد زبان (language)
+                <input id="asr-lang" type="text" value="fa" class="url-in" style="width:100%;font-size:.78rem;padding:.4rem .5rem">
+              </label>
+              <label class="asr-field">دما (temperature) — اختیاری، ۰ تا ۱
+                <input id="asr-temp" type="number" min="0" max="1" step="0.1" placeholder="پیش‌فرض مدل" class="url-in" style="width:100%;font-size:.78rem;padding:.4rem .5rem">
+              </label>
+              <label class="asr-field" style="grid-column:1/-1">متن آماده‌ساز (prompt) — اختیاری، پیش‌فرض: عنوان آیتم + متن آماده‌ساز تنظیم‌شده در پایین همین صفحه
+                <input id="asr-hint" type="text" placeholder="برای override موقت این آزمایش بنویسید" class="url-in" style="width:100%;font-size:.78rem;padding:.4rem .6rem">
+              </label>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;margin-top:.5rem">
+              <div style="font-size:.7rem;color:var(--mu)">کدام مدل‌های ASR تست شوند؟ (پیش‌فرض: همه انتخاب شده‌اند)</div>
+              <div style="display:flex;gap:.4rem">
+                <button class="tmbtn" style="font-size:.65rem" onclick="_asrSelectAll(true)">انتخاب همه</button>
+                <button class="tmbtn" style="font-size:.65rem" onclick="_asrSelectAll(false)">هیچ‌کدام</button>
+              </div>
+            </div>
+            <div id="asr-model-checks" style="display:flex;gap:.9rem;flex-wrap:wrap;margin-bottom:.6rem;font-size:.78rem"></div>
+            <label style="display:flex;align-items:center;gap:.4rem;font-size:.78rem;margin-bottom:.7rem;cursor:pointer">
+              <input type="checkbox" id="asr-dual-chk" style="cursor:pointer">
+              ادغام دو مدل با هوش مصنوعی (فقط وقتی دقیقاً ۲ مدل انتخاب شده باشد)
+            </label>
+            <button class="btn-primary" id="asr-run-btn" onclick="runAsrTest()" style="font-size:.8rem">اجرای آزمون</button>
+            <div id="asr-progress-wrap" style="display:none;margin-top:.7rem">
+              <div class="proc-overall"><span id="asr-progress-lbl"></span><span class="proc-overall-pct" id="asr-progress-pct"></span></div>
+              <div class="proc-bg proc-bg-lg"><div class="proc-bar" id="asr-progress-bar" style="width:0%"></div></div>
+            </div>
+            <div id="asr-test-results" style="margin-top:.9rem"></div>
+          </div>
+        </div>
 
-      <div class="sec-lbl" style="margin-top:.4rem"><span class="sec-ic">≡</span>آیتم‌ها</div>
-      <div style="overflow-x:auto">
-        <table class="ptab" id="admin-table">
-          <thead><tr>
-            <th>عنوان</th><th>منبع</th><th>وضعیت</th><th>مدت</th><th>افزوده‌شده</th><th></th>
-          </tr></thead>
-          <tbody id="admin-tbody"></tbody>
-        </table>
+        <div class="sec-lbl"><span class="sec-ic">✎</span>متن آماده‌ساز (prompt) رونویسی
+          <button class="tmbtn on" id="asr-prompt-save-btn" onclick="savePromptConfig('asr-prompt-save-btn')" style="margin-right:auto;font-size:.7rem">ذخیره</button>
+        </div>
+        <div class="panel" style="margin-bottom:.6rem">
+          <div class="p-bd" style="font-size:.72rem;line-height:1.9;color:var(--mu)">
+            این متن، برخلاف دستورالعمل‌های بالای هوش مصنوعی، یک <b>فرمان</b> نیست — بلکه مدل رونویسی آن را به‌عنوان ادامهٔ یک متن از پیش نوشته‌شده در نظر می‌گیرد و سبک/املای همان کلمات را در ادامه حدس می‌زند. عنوان هر آیتم به‌صورت خودکار قبل از این متن اضافه می‌شود.
+            <br>بهترین کاربرد: چند اسم خاص یا اصطلاح تخصصی/دینی که در آرشیو شما زیاد تکرار می‌شود، با <b>املای درست</b>، در حد یک جمله یا فهرست کوتاه (زیر ۲۰۰ نویسه). دستور دادن ("لطفاً درست بنویس") اثری ندارد چون مدل دستور را دنبال نمی‌کند، فقط سبک نوشتار نمونه را کپی می‌کند.
+          </div>
+        </div>
+        <div id="asr-prompt-cfg-wrap" style="margin-bottom:1rem"></div>
       </div>
     </div>
 
@@ -537,6 +729,7 @@ mark{background:rgba(126,184,247,.25);color:var(--gold);border-radius:.15em}
   <div class="mp-art" id="mp-art"><span style="font-size:1.3rem;opacity:.3">▶</span></div>
   <div class="mp-info">
     <div class="mp-t" id="mp-title"></div>
+    <div class="mp-sub" id="mp-sub"></div>
     <div class="mp-prg-bg"><div class="mp-prg-f" id="mp-prg"></div></div>
   </div>
   <div class="mp-btns">
@@ -956,17 +1149,35 @@ function _onTick() {
   // chapter strip progress bar
   const chProg = document.getElementById('ch-prog-bar');
   if (chProg) chProg.style.width = pct + '%';
-  _highlightCurrentChapter(t);
+  const chapTitle = _highlightCurrentChapter(t);
+  _updateMiniPlayerSub(t, chapTitle);
 }
 
 function _highlightCurrentChapter(t) {
-  if (!ST.paragraphs.length) return;
+  if (!ST.paragraphs.length) return '';
   let cur = 0;
   for (let i = 0; i < ST.paragraphs.length; i++) {
     if ((ST.paragraphs[i].start_sec || 0) <= t) cur = i; else break;
   }
   const chItems = document.querySelectorAll('#ch-list .ch-item');
   chItems.forEach((el, i) => el.classList.toggle('on', i === cur));
+  return ST.paragraphs[cur] ? (ST.paragraphs[cur].title_fa || '') : '';
+}
+
+// mini-player: show current segment text + current chapter title
+let _lastMpSegIdx = -2;
+function _updateMiniPlayerSub(t, chapTitle) {
+  const el = document.getElementById('mp-sub');
+  if (!el) return;
+  const segs = ST.trSegs || [];
+  let idx = -1;
+  for (let i = segs.length - 1; i >= 0; i--) {
+    if ((segs[i].start || 0) <= t) { idx = i; break; }
+  }
+  if (idx === _lastMpSegIdx) return;
+  _lastMpSegIdx = idx;
+  const segText = idx >= 0 ? (segs[idx].text || '') : '';
+  el.textContent = chapTitle ? (segText ? `${chapTitle} · ${segText}` : chapTitle) : segText;
 }
 
 function _updatePlayBtns() {
@@ -1036,7 +1247,7 @@ function _karaokeSync(t) {
   }
   if (idx === _lastKaraokeIdx) return;
   _lastKaraokeIdx = idx;
-  document.querySelectorAll('.para.hi').forEach(el => el.classList.remove('hi'));
+  document.querySelectorAll('.para.hi, .script-seg.hi').forEach(el => el.classList.remove('hi'));
   if (idx >= 0) {
     const el = document.getElementById('kp-' + idx);
     if (el) {
@@ -1046,6 +1257,8 @@ function _karaokeSync(t) {
   }
 }
 
+let _lastBookIdx = -1;
+let _lastBookFrac = -1;
 function _bookSync(t) {
   const paras = ST.paragraphs;
   if (!paras.length) return;
@@ -1053,11 +1266,35 @@ function _bookSync(t) {
   for (let i = paras.length - 1; i >= 0; i--) {
     if ((paras[i].start_sec || 0) <= t) { idx = i; break; }
   }
-  document.querySelectorAll('.bk-section.on').forEach(el => el.classList.remove('on'));
-  if (idx >= 0) {
-    const el = document.getElementById('bs-' + idx);
-    if (el) el.classList.add('on');
+  if (idx !== _lastBookIdx) {
+    document.querySelectorAll('.bk-section.on').forEach(el => el.classList.remove('on'));
+    if (idx >= 0) {
+      const el = document.getElementById('bs-' + idx);
+      if (el) { el.classList.add('on'); el.scrollIntoView({block:'nearest', behavior:'smooth'}); }
+    }
+    _lastBookIdx = idx;
+    _lastBookFrac = -1; // force repaint on chapter change
   }
+  if (idx < 0) return;
+
+  // Approximate reading-position highlight: no per-word timestamps exist for
+  // the rewritten book-mode prose, so we highlight proportionally to how far
+  // through the chapter's [start_sec, end_sec] window playback currently is.
+  const p = paras[idx];
+  const s0 = p.start_sec || 0;
+  const s1 = (p.end_sec != null && p.end_sec > s0) ? p.end_sec : s0 + 1;
+  const frac = Math.min(1, Math.max(0, (t - s0) / (s1 - s0)));
+  _paintBookProgress(idx, frac);
+}
+
+function _paintBookProgress(idx, frac) {
+  if (Math.abs(frac - _lastBookFrac) < 0.004) return;
+  _lastBookFrac = frac;
+  const el = document.getElementById('bkt-' + idx);
+  if (!el) return;
+  const full = el.dataset.full || '';
+  const cut = Math.round(full.length * frac);
+  el.innerHTML = `<span class="bk-read">${esc(full.slice(0, cut))}</span><span class="bk-unread">${esc(full.slice(cut))}</span>`;
 }
 
 // ── open player ───────────────────────────────────────────────────────────────
@@ -1069,9 +1306,9 @@ async function openPlayer(id, autoplay = false) {
   ST.isMultiSpeaker = false;
   ST.trLang = 'fa';
   _lastKaraokeIdx = -1;
-  // reset lang toggle
-  document.getElementById('tm-lang-fa').className = 'tmbtn on';
-  document.getElementById('tm-lang-en').className = 'tmbtn';
+  _lastMpSegIdx = -2;
+  // reset processing panel (avoid showing stale progress from a previously-viewed item)
+  document.getElementById('pn-proc').style.display = 'none';
   Player.destroy();
 
   const item = await fetch(`/api/items/${id}`).then(r => r.json());
@@ -1125,6 +1362,7 @@ async function openPlayer(id, autoplay = false) {
 
   // Init player based on source
   _initPlayerForItem(item, autoplay);
+  _initQualityPicker(item);
 
   // Load transcript + AI
   loadTranscript(id);
@@ -1179,6 +1417,54 @@ async function _initPlayerForItem(item, autoplay) {
         Player.initVideo(item.url_source || '');
       }
     }
+  }
+}
+
+async function _initQualityPicker(item) {
+  const sel = document.getElementById('pl-quality');
+  const isStreamed = item.type === 'video' && item.source && !['youtube', 'upload'].includes(item.source);
+  if (!isStreamed || !item.url_source) { sel.style.display = 'none'; sel.innerHTML = ''; return; }
+
+  sel.style.display = '';
+  sel.innerHTML = '<option>در حال بررسی کیفیت...</option>';
+  try {
+    const r = await fetch(`/api/formats?url=${encodeURIComponent(item.url_source)}`).then(res => res.json());
+    sel.innerHTML = '';
+    (r.qualities || []).forEach(q => {
+      const opt = document.createElement('option');
+      opt.value = q.value;
+      opt.textContent = q.label;
+      if (q.value === (item.preferred_quality || 'best')) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  } catch {
+    sel.style.display = 'none';
+  }
+}
+
+async function changeQuality(e) {
+  const val = e.target.value;
+  const id = ST.id;
+  if (!id || !ST.item) return;
+  const resumeTime = Player.time || 0;
+  const wasPlaying = Player.playing;
+  try {
+    await fetch(`/api/items/${id}`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({quality: val})
+    });
+    ST.item.preferred_quality = val;
+    await _initPlayerForItem(ST.item, false);
+    const vid = document.getElementById('hls-video');
+    const resume = () => {
+      Player.seek(resumeTime);
+      if (wasPlaying) Player.play();
+      vid.removeEventListener('loadedmetadata', resume);
+    };
+    vid.addEventListener('loadedmetadata', resume);
+  } catch (err) {
+    alert('خطا در تغییر کیفیت: ' + err.message);
   }
 }
 
@@ -1270,36 +1556,58 @@ const SP_COLORS = {A:'sp-a', B:'sp-b', C:'sp-c', D:'sp-d'};
 
 function renderKaraoke(wrap) {
   wrap.innerHTML = '';
-  // Speaker legend
-  if (ST.isMultiSpeaker && Object.keys(ST.speakerNames).length) {
-    const legend = document.createElement('div');
-    legend.className = 'sp-legend';
-    Object.entries(ST.speakerNames).forEach(([sp, name]) => {
-      const li = document.createElement('div');
-      li.className = 'sp-leg-item';
-      li.innerHTML = `<span class="sp-chip ${SP_COLORS[sp]||'sp-a'}">${esc(sp)}</span><span>${esc(name)}</span>`;
-      legend.appendChild(li);
+  const segs = ST.trSegs;
+
+  if (!ST.isMultiSpeaker) {
+    // single speaker — flat, one row per segment
+    segs.forEach((s, i) => {
+      const isSacred = ST.sacredSet.has(s.seg_index ?? i);
+      const isQuote  = ST.quotesSet.has(s.seg_index ?? i);
+      const cls = isSacred ? 'sacred' : isQuote ? 'ext-quote' : '';
+      const para = document.createElement('div');
+      para.className = 'para';
+      para.id = 'kp-' + i;
+      const ts = s.start != null ? fmtTime(s.start) : '';
+      para.innerHTML = `
+        <span class="para-ts" onclick="Player.seek(${s.start||0})">${ts}</span>
+        <div class="para-body${cls?' '+cls:''}">${esc(s.text||'')}</div>`;
+      para.onclick = () => Player.seek(s.start || 0);
+      wrap.appendChild(para);
     });
-    wrap.appendChild(legend);
+    return;
   }
-  let lastSpeaker = null;
-  ST.trSegs.forEach((s, i) => {
-    const isSacred = ST.sacredSet.has(s.seg_index ?? i);
-    const isQuote  = ST.quotesSet.has(s.seg_index ?? i);
+
+  // multi-speaker — script/play style: group consecutive same-speaker
+  // segments into one turn, name + color at the start of each turn.
+  const groups = [];
+  segs.forEach((s, i) => {
     const sp = ST.speakersMap[s.seg_index ?? i] || null;
-    const para = document.createElement('div');
-    para.className = 'para';
-    para.id = 'kp-' + i;
-    const ts = s.start != null ? fmtTime(s.start) : '';
-    const cls = isSacred ? 'sacred' : isQuote ? 'ext-quote' : '';
-    const spHtml = (ST.isMultiSpeaker && sp && sp !== lastSpeaker)
-      ? `<span class="sp-chip ${SP_COLORS[sp]||'sp-a'}">${esc(sp)}</span>` : '';
-    if (sp) lastSpeaker = sp;
-    para.innerHTML = `
-      <span class="para-ts" onclick="Player.seek(${s.start||0})">${ts}</span>
-      <div class="para-body${cls?' '+cls:''}">${spHtml}${esc(s.text||'')}</div>`;
-    para.onclick = () => Player.seek(s.start || 0);
-    wrap.appendChild(para);
+    const last = groups[groups.length - 1];
+    if (last && last.speaker === sp) {
+      last.items.push({...s, _i: i});
+    } else {
+      groups.push({speaker: sp, items: [{...s, _i: i}]});
+    }
+  });
+
+  groups.forEach(g => {
+    const sp = g.speaker;
+    const name = sp ? (ST.speakerNames[sp] || sp) : '';
+    const colorCls = sp ? (SP_COLORS[sp] || 'sp-a').replace('sp-', 'spk-') : '';
+    const turn = document.createElement('div');
+    turn.className = 'script-turn' + (colorCls ? ' ' + colorCls : '');
+    const ts = g.items[0].start != null ? fmtTime(g.items[0].start) : '';
+    let bodyHtml = '';
+    g.items.forEach(s => {
+      const isSacred = ST.sacredSet.has(s.seg_index ?? s._i);
+      const isQuote  = ST.quotesSet.has(s.seg_index ?? s._i);
+      const cls = isSacred ? ' sacred' : isQuote ? ' ext-quote' : '';
+      bodyHtml += `<span class="script-seg${cls}" id="kp-${s._i}" onclick="Player.seek(${s.start||0})">${esc(s.text||'')} </span>`;
+    });
+    turn.innerHTML = (name
+      ? `<div class="script-name">${esc(name)} <span class="script-ts">${ts}</span></div>`
+      : '') + `<div class="script-body">${bodyHtml}</div>`;
+    wrap.appendChild(turn);
   });
 }
 
@@ -1315,9 +1623,11 @@ function renderBook(wrap) {
         <span class="bk-title">${esc(p.title_fa||'')}</span>
         <span class="bk-ts">${fmtTime(p.start_sec||0)}</span>
       </div>
-      <div class="bk-text">${esc(p.text_fa||'')}</div>`;
+      <div class="bk-text" id="bkt-${i}" data-full="${esc(p.text_fa||'')}">${esc(p.text_fa||'')}</div>`;
     wrap.appendChild(sec);
   });
+  _lastBookIdx = -1;
+  _lastBookFrac = -1;
 }
 
 function setTrMode(mode) {
@@ -1327,46 +1637,6 @@ function setTrMode(mode) {
   renderTranscript();
 }
 
-async function setTrLang(lang) {
-  document.getElementById('tm-lang-fa').className = 'tmbtn' + (lang==='fa'?' on':'');
-  document.getElementById('tm-lang-en').className = 'tmbtn' + (lang==='en'?' on':'');
-  const id = ST.id;
-  if (!id) return;
-  const cacheKey = id + '_' + lang;
-  if (ST.trCache[cacheKey]) {
-    ST.trSegs = ST.trCache[cacheKey];
-    if (lang === 'fa') {
-      ST.speakersMap = {};
-      ST.trSegs.forEach(s => { if (s.speaker) ST.speakersMap[s.seg_index ?? 0] = s.speaker; });
-    } else {
-      ST.speakersMap = {};
-      ST.isMultiSpeaker = false;
-    }
-    _buildWvBars();
-    renderTranscript();
-    return;
-  }
-  document.getElementById('tr-wrap').innerHTML = '<div class="msg ldots">در حال بارگذاری</div>';
-  try {
-    const data = await fetch(`/api/items/${id}/transcript?lang=${lang}`).then(r => r.json());
-    const segs = data.segments || [];
-    if (lang === 'en' && !segs.length) {
-      document.getElementById('tr-wrap').innerHTML = '<div class="msg">ترجمه‌ای موجود نیست — ترجمه خودکار را از تنظیمات مدل فعال کنید</div>';
-      return;
-    }
-    ST.trCache[cacheKey] = segs;
-    ST.trSegs = segs;
-    ST.speakersMap = {};
-    if (lang === 'fa') segs.forEach(s => { if (s.speaker) ST.speakersMap[s.seg_index ?? 0] = s.speaker; });
-    else { ST.isMultiSpeaker = false; }
-    _buildWvBars();
-    renderTranscript();
-  } catch {
-    document.getElementById('tr-wrap').innerHTML = lang === 'en'
-      ? '<div class="msg">ترجمه‌ای موجود نیست — ترجمه خودکار را از تنظیمات مدل فعال کنید</div>'
-      : '<div class="msg">رونویسی موجود نیست</div>';
-  }
-}
 
 function renderChapterStrip() {
   const strip = document.getElementById('ch-strip');
@@ -1415,29 +1685,6 @@ function renderChapters() {
     el.appendChild(item);
   });
   renderChapterStrip();
-
-  // Timeline from infographic
-  if (ST.ai?.['infographic_fa']?.content) {
-    try {
-      const ig = typeof ST.ai['infographic_fa'].content === 'string'
-        ? JSON.parse(ST.ai['infographic_fa'].content) : ST.ai['infographic_fa'].content;
-      const tl = ig.timeline || [];
-      if (tl.length) {
-        const tlDiv = document.createElement('div');
-        tlDiv.innerHTML = `<div class="sec-lbl" style="margin-top:.7rem"><span class="sec-ic">▷</span>روند محتوا</div>`;
-        const tldots = document.createElement('div');
-        tldots.className = 'tldots';
-        tl.forEach(phase => {
-          const di = document.createElement('div');
-          di.className = 'tl-di';
-          di.innerHTML = `<div class="tl-dc"></div><div class="tl-dt">${esc(phase.topic_fa||phase.phase||'')}</div><div class="tl-di2">${esc(phase.insight_fa||'')}</div>`;
-          tldots.appendChild(di);
-        });
-        tlDiv.appendChild(tldots);
-        el.appendChild(tlDiv);
-      }
-    } catch {}
-  }
 }
 
 function renderAnalysis(ai) {
@@ -1472,6 +1719,18 @@ function renderAnalysis(ai) {
     html += `<div class="sum-block"><div class="sum-ll">مفاهیم کلیدی</div><div class="c-tags">`;
     igData.key_concepts.slice(0,10).forEach(c => {
       html += `<span class="tag-chip">${esc(c.term_fa||'')} <span style="opacity:.6;font-size:.9em">${c.mentions||''}</span></span>`;
+    });
+    html += `</div></div>`;
+  }
+
+  if (igData?.timeline?.length) {
+    html += `<div class="sum-block"><div class="sum-ll">روند محتوا</div><div class="tldots">`;
+    igData.timeline.forEach(phase => {
+      html += `<div class="tl-di">
+        <div class="tl-dc"></div>
+        <div class="tl-dt">${esc(phase.topic_fa||phase.phase||'')}</div>
+        <div class="tl-di2">${esc(phase.insight_fa||'')}</div>
+      </div>`;
     });
     html += `</div></div>`;
   }
@@ -1515,7 +1774,7 @@ async function pollProgress(id) {
     if (artworkDone || (!anyRunning && steps.length > 0)) {
       const item = await fetch(`/api/items/${id}`).then(r => r.json());
       if (['done','error'].includes(item.status)) {
-        document.getElementById('pl-proc').style.display = 'none';
+        document.getElementById('pn-proc').style.display = 'none';
         loadAI(id);
         return;
       }
@@ -1525,18 +1784,28 @@ async function pollProgress(id) {
 }
 
 function renderProcPanel(steps) {
+  const panel = document.getElementById('pn-proc');
   const el = document.getElementById('pl-proc');
-  if (!el) return;
-  const anyActive = steps.some(s => s.status === 'running' || (s.status !== 'done' && s.status !== 'error' && s.status !== 'pending'));
+  if (!el || !panel) return;
   const allDone = steps.length > 0 && steps.every(s => s.status === 'done' || s.status === 'error');
-  if (allDone) { el.style.display = 'none'; return; }
-  el.style.display = '';
-  let html = `<div class="proc-hd">در حال پردازش</div>`;
+  if (allDone) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+
+  const doneCount = steps.filter(s => s.status === 'done').length;
+  const overallPct = steps.length ? Math.round((doneCount / steps.length) * 100) : 0;
+  let html = `<div class="proc-overall">
+    <span>${doneCount} از ${steps.length} مرحله</span><span class="proc-overall-pct">${overallPct}%</span>
+  </div>
+  <div class="proc-bg proc-bg-lg"><div class="proc-bar" style="width:${overallPct}%"></div></div>`;
+
   steps.forEach(s => {
     const pct = s.status === 'done' ? 100 : s.status === 'error' ? 100 : (s.progress_pct || 0);
     const barCls = s.status === 'done' ? 'done' : s.status === 'error' ? 'err' : '';
-    const pctLbl = s.status === 'done' ? '✓' : s.status === 'error' ? '✗' : s.status === 'running' && pct > 0 ? pct + '%' : s.status === 'running' ? '⟳' : '';
-    html += `<div class="proc-row">
+    const pctLbl = s.status === 'done' ? '✓' : s.status === 'error' ? '✗'
+      : s.status === 'running' && pct > 0 ? pct + '%'
+      : s.status === 'running' ? '⟳' : '';
+    const rowCls = s.status === 'running' ? ' proc-row-active' : '';
+    html += `<div class="proc-row${rowCls}">
       <span class="proc-nm">${STEP_NAMES[s.step]||s.step}</span>
       <div class="proc-bg"><div class="proc-bar ${barCls}" style="width:${pct}%"></div></div>
       <span class="proc-pct">${pctLbl}</span>
@@ -1558,6 +1827,7 @@ function dismissMiniPlayer() {
   Player.pause();
   Player.destroy();
   document.getElementById('mp').classList.remove('vis');
+  document.getElementById('mp-sub').textContent = '';
   ST.id = null;
 }
 
@@ -1733,10 +2003,35 @@ function removeSearchHist(q) {
 }
 
 // ── import ────────────────────────────────────────────────────────────────────
+async function checkQualities() {
+  const url = document.getElementById('url-in').value.trim();
+  if (!url) { alert('ابتدا لینک را وارد کنید'); return; }
+  const sel = document.getElementById('q-select');
+  sel.style.display = '';
+  sel.innerHTML = '<option>در حال بررسی...</option>';
+  try {
+    const r = await fetch(`/api/formats?url=${encodeURIComponent(url)}`).then(res => res.json());
+    sel.innerHTML = '';
+    (r.qualities || []).forEach(q => {
+      const opt = document.createElement('option');
+      opt.value = q.value;
+      opt.textContent = q.label;
+      sel.appendChild(opt);
+    });
+  } catch(e) {
+    sel.style.display = 'none';
+    alert('خطا در بررسی کیفیت: ' + e.message);
+  }
+}
+
 async function importUrl() {
   const url = document.getElementById('url-in').value.trim();
   if (!url) return;
+  const qSel = document.getElementById('q-select');
+  const quality = (qSel.style.display !== 'none' && qSel.value) ? qSel.value : 'best';
   document.getElementById('url-in').value = '';
+  qSel.style.display = 'none';
+  qSel.innerHTML = '';
   const btn = document.querySelector('#p-import .btn-primary');
   btn.textContent = '...';
   btn.disabled = true;
@@ -1744,7 +2039,7 @@ async function importUrl() {
     const r = await fetch('/api/items', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({url})
+      body: JSON.stringify({url, quality})
     }).then(res => res.json());
     if (r.error) alert(r.error);
     else { loadQueue(); Object.assign(ST.map, {}); }
@@ -1802,6 +2097,13 @@ async function loadQueue() {
 // ── admin ─────────────────────────────────────────────────────────────────────
 const STEP_NAMES = {import:'دانلود',transcribe:'رونویسی',correct:'اصلاح',translate:'ترجمه',diarize:'گویندگان',paragraphs:'فصل‌بندی',summarize:'خلاصه',mentions:'اشاره‌ها',infographic:'اینفوگرافیک',sacred:'متون مقدس',quotes:'نقل‌قول‌ها',artwork:'آرت‌ورک'};
 
+function settingsTab(tab) {
+  document.querySelectorAll('.set-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  document.querySelectorAll('.set-page').forEach(p => p.style.display = p.id === 'set-page-' + tab ? '' : 'none');
+  if (tab === 'models' && !ST._capListLoaded) { ST._capListLoaded = true; loadModelCapabilityList(); }
+  if (tab === 'chunking' && !ST._chunkCfgLoaded) { ST._chunkCfgLoaded = true; loadChunkingConfigUI(); }
+}
+
 async function loadAdmin() {
   const [stats, pipeStats, workers, itemsResp, modelCfg, promptCfg, collsResp, tagsResp] = await Promise.all([
     fetch('/api/stats').then(r => r.json()),
@@ -1842,12 +2144,15 @@ async function loadAdmin() {
     </div>`;
   }).join('');
 
-  // Model config editor
+  // Model config editor — LLM order lives in the مدل‌ها tab, ASR fallback
+  // order + the ASR-dual toggle live in their own رونویسی ASR tab.
   ST._modelCfg = modelCfg;
   const available = modelCfg.available || [];
-  const wrap = document.getElementById('model-cfg-wrap');
-  wrap.innerHTML = '';
-  [['asr','رونویسی (ASR)'], ['llm','هوش مصنوعی (LLM)']].forEach(([cat, label]) => {
+  const modelsWrap = document.getElementById('model-cfg-wrap');
+  const asrWrap = document.getElementById('asr-cfg-wrap');
+  modelsWrap.innerHTML = '';
+  asrWrap.innerHTML = '';
+  [['asr', 'مدل‌های ASR', asrWrap], ['llm', 'هوش مصنوعی (LLM)', modelsWrap]].forEach(([cat, label, targetWrap]) => {
     const catModels = modelCfg[cat] || [];
     const div = document.createElement('div');
     div.className = 'panel';
@@ -1859,16 +2164,16 @@ async function loadAdmin() {
           ${available.filter(m => !catModels.includes(m)).map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('')}
         </select>
       </div>`;
-    wrap.appendChild(div);
+    targetWrap.appendChild(div);
     const sel = div.querySelector(`#cfg-add-${cat}`);
     sel.onchange = () => { if(sel.value) { addModelToCat(cat, sel.value); sel.value=''; } };
     renderCatList(cat, catModels, available);
   });
 
-  // Boolean toggles: translate, asr_dual
+  // Boolean toggles: asr_dual — lives next to the ASR order editor
   const togglesDiv = document.createElement('div');
-  togglesDiv.style.cssText = 'grid-column:1/-1;display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:.5rem';
-  [['translate','ترجمه خودکار به انگلیسی'],['asr_dual','حالت دو‌مدله (ASR Dual)']].forEach(([key, label]) => {
+  togglesDiv.style.cssText = 'display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:.5rem';
+  [['asr_dual','حالت دو‌مدله (ASR Dual) — پیش‌فرض تولید، مستقل از آزمایشگاه پایین صفحه']].forEach(([key, label]) => {
     const id = 'tog-' + key;
     const checked = modelCfg[key] ? 'checked' : '';
     const span = document.createElement('label');
@@ -1880,7 +2185,7 @@ async function loadAdmin() {
     };
     togglesDiv.appendChild(span);
   });
-  wrap.appendChild(togglesDiv);
+  asrWrap.appendChild(togglesDiv);
 
   // Prompt config editor
   ST._promptCfg = promptCfg;
@@ -1943,6 +2248,360 @@ async function loadAdmin() {
     det.innerHTML = `<td colspan="6" style="padding:0"><div id="steps-bd-${it.id}" style="padding:.5rem .65rem;background:var(--surf)"></div></td>`;
     tbody.appendChild(det);
   });
+
+  _populateAsrLab(itemsResp.items || []);
+  _populateChunkLab(itemsResp.items || []);
+}
+
+// ── Models: import + capability test ────────────────────────────────────────
+const CAP_LABELS = {text:'متن', embedding:'جاسازی', image:'تصویر', audio:'صدا'};
+
+async function loadModelCapabilityList() {
+  const el = document.getElementById('model-capability-list');
+  el.innerHTML = '<div class="msg ldots">در حال بارگذاری فهرست مدل‌ها</div>';
+  try {
+    const { models } = await fetch('/api/admin/all-models').then(r => r.json());
+    el.innerHTML = (models || []).map(m => `
+      <div class="model-cap-row" id="cap-row-${cssEsc(m)}">
+        <span class="model-cap-name">${esc(m)}</span>
+        <span class="model-cap-badges" id="cap-badges-${cssEsc(m)}" style="display:flex;gap:.35rem;flex-wrap:wrap">
+          ${Object.keys(CAP_LABELS).map(c => `<span class="model-cap-badge">${CAP_LABELS[c]}</span>`).join('')}
+        </span>
+        <button class="tmbtn" style="font-size:.68rem;margin-right:auto" onclick="testModelCapability('${esc(m)}')">تست</button>
+      </div>`).join('') || '<div class="msg">مدلی یافت نشد</div>';
+  } catch (e) {
+    el.innerHTML = `<div class="msg">خطا: ${esc(e.message)}</div>`;
+  }
+}
+
+function cssEsc(s) { return String(s).replace(/[^a-zA-Z0-9_-]/g, '_'); }
+
+async function testModelCapability(model) {
+  const badgesEl = document.getElementById('cap-badges-' + cssEsc(model));
+  if (!badgesEl) return;
+  badgesEl.innerHTML = Object.keys(CAP_LABELS).map(c => `<span class="model-cap-badge">${CAP_LABELS[c]} ⟳</span>`).join('');
+  try {
+    const { results } = await fetch('/api/admin/test-model-capabilities', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ model }),
+    }).then(r => r.json());
+    badgesEl.innerHTML = Object.entries(CAP_LABELS).map(([key, label]) => {
+      const r = results?.[key];
+      if (!r) return `<span class="model-cap-badge">${label}</span>`;
+      const cls = r.ok ? 'ok' : 'err';
+      const title = r.ok ? `${r.sample || ''} (${r.latency_sec}ث)` : (r.error || '');
+      return `<span class="model-cap-badge ${cls}" title="${esc(title)}">${label} ${r.ok?'✓':'✗'}</span>`;
+    }).join('');
+  } catch (e) {
+    badgesEl.innerHTML = `<span class="model-cap-badge err">خطا: ${esc(e.message)}</span>`;
+  }
+}
+
+// ── Audio chunking settings + waveform test lab ─────────────────────────────
+async function loadChunkingConfigUI() {
+  try {
+    const cfg = await fetch('/api/admin/chunking-config').then(r => r.json());
+    document.getElementById(cfg.algorithm === 'fixed' ? 'chunk-algo-fixed' : 'chunk-algo-adaptive').checked = true;
+    document.getElementById('chunk-percentile').value = cfg.percentile;
+    document.getElementById('chunk-fixed-db').value = cfg.fixed_db;
+    document.getElementById('chunk-min-dur').value = cfg.min_silence_dur;
+    document.getElementById('chunk-max-drift').value = cfg.max_drift_sec;
+    document.getElementById('chunk-overlap').value = cfg.overlap_sec;
+    document.getElementById('chunk-max-mb').value = cfg.max_mb;
+  } catch (e) { /* keep form empty on failure */ }
+}
+
+function _readChunkingForm() {
+  return {
+    algorithm: document.getElementById('chunk-algo-fixed').checked ? 'fixed' : 'adaptive',
+    percentile: Number(document.getElementById('chunk-percentile').value) || 10,
+    fixed_db: Number(document.getElementById('chunk-fixed-db').value) || -35,
+    min_silence_dur: Number(document.getElementById('chunk-min-dur').value) || 0.5,
+    max_drift_sec: Number(document.getElementById('chunk-max-drift').value) || 60,
+    overlap_sec: Number(document.getElementById('chunk-overlap').value) || 3,
+    max_mb: Number(document.getElementById('chunk-max-mb').value) || 19,
+  };
+}
+
+async function saveChunkingConfig() {
+  const btn = document.getElementById('chunk-cfg-save-btn');
+  const orig = btn.textContent;
+  btn.textContent = '...';
+  try {
+    await fetch('/api/admin/chunking-config', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(_readChunkingForm()),
+    });
+    btn.textContent = '✓ ذخیره شد';
+  } catch (e) {
+    btn.textContent = 'خطا';
+  }
+  setTimeout(() => { btn.textContent = orig; }, 2000);
+}
+
+function renderWaveformChart(dbCurve, thresholdDb, chunks, totalDuration) {
+  if (!dbCurve || !dbCurve.length) return '<div class="msg">داده‌ای برای رسم نمودار نیست</div>';
+  const W = 1000, H = 180, PAD = 4;
+  const minDb = -90, maxDb = 0;
+  const xOf = t => PAD + (t / totalDuration) * (W - 2 * PAD);
+  const yOf = db => PAD + (1 - (Math.max(db, minDb) - minDb) / (maxDb - minDb)) * (H - 2 * PAD);
+  const pathPts = dbCurve.map(([t, db]) => `${xOf(t).toFixed(1)},${yOf(db).toFixed(1)}`).join(' ');
+  const areaPts = `${xOf(dbCurve[0][0]).toFixed(1)},${H-PAD} ${pathPts} ${xOf(dbCurve[dbCurve.length-1][0]).toFixed(1)},${H-PAD}`;
+  const thrY = yOf(thresholdDb).toFixed(1);
+  // boundary times = every chunk's nom_start except the very first chunk (0)
+  const boundaries = (chunks || []).slice(1).map(c => ({ t: c.nom_start, snapped: c.cut_snapped_to_silence }));
+  const boundarySvg = boundaries.map(b => {
+    const x = xOf(b.t).toFixed(1);
+    const color = b.snapped ? 'var(--ok)' : 'var(--err)';
+    return `<line x1="${x}" y1="${PAD}" x2="${x}" y2="${H-PAD}" stroke="${color}" stroke-width="1.5" stroke-dasharray="4,3"/>`;
+  }).join('');
+  return `<div dir="ltr" style="overflow-x:auto">
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;display:block" preserveAspectRatio="none">
+      <polygon points="${areaPts}" fill="var(--gold2)" stroke="none"/>
+      <polyline points="${pathPts}" fill="none" stroke="var(--gold)" stroke-width="1"/>
+      <line x1="${PAD}" y1="${thrY}" x2="${W-PAD}" y2="${thrY}" stroke="var(--err)" stroke-width="1" stroke-dasharray="2,2"/>
+      ${boundarySvg}
+    </svg>
+  </div>
+  <div style="display:flex;gap:1rem;flex-wrap:wrap;font-size:.65rem;color:var(--mu);margin-top:.3rem">
+    <span><span style="display:inline-block;width:10px;height:10px;background:var(--gold);border-radius:2px;vertical-align:middle"></span> بلندی صدا (dB)</span>
+    <span><span style="display:inline-block;width:14px;height:0;border-top:1px dashed var(--err);vertical-align:middle"></span> آستانه سکوت (${thresholdDb} dB)</span>
+    <span><span style="display:inline-block;width:14px;height:0;border-top:2px dashed var(--ok);vertical-align:middle"></span> برش روی سکوت</span>
+    <span><span style="display:inline-block;width:14px;height:0;border-top:2px dashed var(--err);vertical-align:middle"></span> برش خشک</span>
+  </div>`;
+}
+
+// ── Audio chunking test lab ──────────────────────────────────────────────────
+function _populateChunkLab(items) {
+  const sel = document.getElementById('chunk-item-sel');
+  const withAudio = items.filter(it => it.file_path);
+  sel.innerHTML = withAudio.length
+    ? withAudio.map(it => `<option value="${it.id}">${esc((it.title||it.title_fa||it.id).slice(0,60))}</option>`).join('')
+    : '<option value="">آیتمی با فایل صوتی یافت نشد</option>';
+}
+
+function fmtHMS(sec) {
+  sec = Math.max(0, Math.round(sec));
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+  return h > 0 ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${m}:${String(s).padStart(2,'0')}`;
+}
+
+async function runChunkTest() {
+  const itemId = document.getElementById('chunk-item-sel').value;
+  const nChunks = Number(document.getElementById('chunk-n').value) || 4;
+  const summaryEl = document.getElementById('chunk-test-summary');
+  const resEl = document.getElementById('chunk-test-results');
+  const btn = document.getElementById('chunk-run-btn');
+  if (!itemId) { alert('یک آیتم انتخاب کنید'); return; }
+
+  btn.disabled = true;
+  const origLabel = btn.textContent;
+  btn.textContent = 'در حال برش...';
+  summaryEl.innerHTML = '';
+  resEl.innerHTML = '<div class="msg ldots">در حال تحلیل سکوت‌ها و برش فایل</div>';
+
+  try {
+    const formCfg = _readChunkingForm();
+    const data = await fetch('/api/admin/test-chunking', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ item_id: itemId, n_chunks: nChunks, ...formCfg }),
+    }).then(r => r.json());
+
+    if (data.detail) { resEl.innerHTML = `<div class="msg">${esc(data.detail)}</div>`; return; }
+
+    const snappedCount = (data.chunks||[]).filter(c => c.cut_snapped_to_silence).length;
+    const internalCuts = (data.chunks||[]).length - 1;
+    const algoLabel = data.algorithm === 'fixed' ? 'ثابت' : 'نسبی به فایل';
+    summaryEl.innerHTML = `مدت کل: ${fmtHMS(data.total_duration)} · تعداد قطعه: ${data.n_chunks} ·
+      الگوریتم: ${algoLabel} (آستانه محاسبه‌شده: ${data.threshold_db} dB) ·
+      سکوت‌های شناسایی‌شده در کل فایل: ${data.silences_detected} ·
+      برش‌های منطبق با سکوت: <span style="color:${snappedCount===internalCuts?'var(--ok)':'var(--err)'}">${snappedCount} از ${internalCuts}</span>`;
+
+    document.getElementById('chunk-waveform-wrap').innerHTML =
+      renderWaveformChart(data.db_curve, data.threshold_db, data.chunks, data.total_duration);
+
+    resEl.innerHTML = (data.chunks||[]).map(c => {
+      const snapLabel = c.cut_snapped_to_silence === null ? '' :
+        c.cut_snapped_to_silence
+          ? `<span style="color:var(--ok)">✓ شروع روی سکوت (اختلاف ${c.drift_from_target_sec}ث از نقطه هدف)</span>`
+          : `<span style="color:var(--err)">✗ برش خشک — نقطه ساکتی نزدیک پیدا نشد</span>`;
+      return `<div class="panel" style="margin-bottom:.5rem">
+        <div class="p-hd">
+          <span class="p-hd-ic">${c.idx+1}</span>قطعه ${c.idx+1}
+          <span style="margin-right:auto;font-family:var(--ff-mono);font-size:.72rem;color:var(--mu)">
+            ${fmtHMS(c.nom_start)} → ${fmtHMS(c.nom_end)} (${fmtHMS(c.duration)})
+          </span>
+        </div>
+        <div class="p-bd">
+          <div style="font-size:.7rem;margin-bottom:.4rem">${snapLabel}</div>
+          <audio controls preload="none" style="width:100%" src="${c.audio_url}"></audio>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    resEl.innerHTML = `<div class="msg">خطا: ${esc(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origLabel;
+  }
+}
+
+// ── ASR test lab ─────────────────────────────────────────────────────────────
+async function _populateAsrLab(items) {
+  const sel = document.getElementById('asr-item-sel');
+  const withAudio = items.filter(it => it.file_path);
+  sel.innerHTML = withAudio.length
+    ? withAudio.map(it => `<option value="${it.id}">${esc((it.title||it.title_fa||it.id).slice(0,60))}</option>`).join('')
+    : '<option value="">آیتمی با فایل صوتی یافت نشد</option>';
+
+  const checksEl = document.getElementById('asr-model-checks');
+  try {
+    const { models } = await fetch('/api/admin/asr-models').then(r => r.json());
+    checksEl.innerHTML = (models || []).map(m => `
+      <label style="display:flex;align-items:center;gap:.35rem;cursor:pointer">
+        <input type="checkbox" class="asr-model-chk" value="${esc(m)}" checked style="cursor:pointer">
+        ${esc(m)}
+      </label>`).join('') || '<span style="color:var(--mu)">مدل ASR پیکربندی نشده</span>';
+  } catch {
+    checksEl.innerHTML = '<span style="color:var(--mu)">خطا در بارگذاری مدل‌ها</span>';
+  }
+}
+
+function _asrSelectAll(on) {
+  document.querySelectorAll('.asr-model-chk').forEach(c => { c.checked = on; });
+}
+
+function _asrModelCard(model, r) {
+  const ok = r.ok;
+  const body = ok ? (r.text || '(متن خالی)') : (r.error || 'خطا');
+  const paramsLine = r.params
+    ? `<div style="font-size:.62rem;color:var(--mu);font-family:var(--ff-mono);padding:.3rem .85rem 0">
+        language=${esc(r.params.language||'')} · temperature=${r.params.temperature ?? 'default'} · prompt="${esc((r.params.context_hint||'').slice(0,40))}"
+       </div>` : '';
+  return `<div class="panel" style="margin-bottom:.6rem">
+    <div class="p-hd">
+      <span class="p-hd-ic">◈</span>${esc(model)}
+      <span style="margin-right:auto;font-family:var(--ff-mono);font-size:.7rem;color:${ok?'var(--ok)':'var(--err)'}">${r.latency_sec}ث</span>
+    </div>
+    ${paramsLine}
+    <div class="p-bd" style="font-size:.82rem;line-height:1.9;white-space:pre-wrap">${esc(body)}</div>
+  </div>`;
+}
+
+function _asrSetProgress(done, total, label) {
+  const wrap = document.getElementById('asr-progress-wrap');
+  wrap.style.display = '';
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  document.getElementById('asr-progress-bar').style.width = pct + '%';
+  document.getElementById('asr-progress-pct').textContent = pct + '%';
+  document.getElementById('asr-progress-lbl').textContent = label || `${done} از ${total}`;
+}
+
+async function runAsrTest() {
+  const itemId = document.getElementById('asr-item-sel').value;
+  const models = [...document.querySelectorAll('.asr-model-chk:checked')].map(c => c.value);
+  const resEl = document.getElementById('asr-test-results');
+  const runBtn = document.getElementById('asr-run-btn');
+  if (!itemId) { alert('یک آیتم انتخاب کنید'); return; }
+  if (!models.length) { alert('حداقل یک مدل انتخاب کنید'); return; }
+
+  const wantDual = document.getElementById('asr-dual-chk').checked && models.length === 2;
+  const totalSteps = models.length + (wantDual ? 1 : 0);
+
+  const baseBody = {
+    item_id: itemId,
+    start_sec: Number(document.getElementById('asr-start').value) || 0,
+    duration_sec: Number(document.getElementById('asr-dur').value) || 60,
+    language: document.getElementById('asr-lang').value.trim() || 'fa',
+  };
+  const hint = document.getElementById('asr-hint').value.trim();
+  if (hint) baseBody.context_hint = hint;
+  const temp = document.getElementById('asr-temp').value;
+  if (temp !== '') baseBody.temperature = Number(temp);
+
+  runBtn.disabled = true;
+  resEl.innerHTML = '';
+  let done = 0;
+  _asrSetProgress(0, totalSteps, `در حال اجرا روی ${models.length} مدل...`);
+
+  // Fire one request per model in parallel; render + advance the bar as each resolves.
+  const resultsByModel = {};
+  const cards = {};
+  models.forEach(m => { cards[m] = document.createElement('div'); resEl.appendChild(cards[m]); });
+
+  await Promise.all(models.map(async model => {
+    try {
+      const r = await fetch('/api/admin/test-asr-one', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({...baseBody, model}),
+      }).then(res => res.json());
+      resultsByModel[model] = r;
+      cards[model].innerHTML = _asrModelCard(model, r);
+    } catch (e) {
+      resultsByModel[model] = {ok: false, error: e.message, latency_sec: 0};
+      cards[model].innerHTML = _asrModelCard(model, resultsByModel[model]);
+    }
+    done++;
+    _asrSetProgress(done, totalSteps, `${done} از ${totalSteps} مرحله انجام شد`);
+  }));
+
+  // Sanity check: if two different models return byte-for-byte identical
+  // text, they're almost certainly hitting the same underlying engine on
+  // the gateway (seen in practice with GPT-4o-Transcribe silently being
+  // served by the same backend as Whisper-1) rather than really being two
+  // independent models. Flag it loudly instead of letting it look like a
+  // coincidence.
+  const okModels = models.filter(m => resultsByModel[m]?.ok && resultsByModel[m].text);
+  const dupPairs = [];
+  for (let i = 0; i < okModels.length; i++) {
+    for (let j = i + 1; j < okModels.length; j++) {
+      if (resultsByModel[okModels[i]].text === resultsByModel[okModels[j]].text) {
+        dupPairs.push([okModels[i], okModels[j]]);
+      }
+    }
+  }
+  if (dupPairs.length) {
+    const warn = document.createElement('div');
+    warn.className = 'panel';
+    warn.style.cssText = 'margin-bottom:.6rem;border-color:var(--err)';
+    warn.innerHTML = `<div class="p-bd" style="font-size:.8rem;line-height:1.9;color:var(--err)">
+      ⚠ خروجی ${dupPairs.map(([a,b]) => `«${esc(a)}» و «${esc(b)}»`).join('، ')} کاملاً یکسان است.
+      این یعنی این مدل‌ها احتمالاً روی درگاه (ArvanCloud) به یک موتور واحد وصل شده‌اند و در عمل یک مدل هستند، نه دو مدل مستقل.
+      برای بررسی بیشتر با پشتیبانی ArvanCloud هماهنگ کنید؛ فعلاً استفاده از این دو با هم در «ادغام دو مدل» فایده‌ای ندارد.
+    </div>`;
+    resEl.insertBefore(warn, resEl.firstChild);
+  }
+
+  if (wantDual) {
+    const [a, b] = models;
+    const mergeCard = document.createElement('div');
+    mergeCard.innerHTML = '<div class="msg ldots" style="padding:.6rem 0">در حال ادغام</div>';
+    resEl.appendChild(mergeCard);
+    try {
+      const merged = await fetch('/api/admin/test-asr-merge', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          model_a: a, text_a: resultsByModel[a]?.text || '',
+          model_b: b, text_b: resultsByModel[b]?.text || '',
+        }),
+      }).then(res => res.json());
+      mergeCard.innerHTML = `<div class="panel" style="border-color:var(--gold)">
+        <div class="p-hd"><span class="p-hd-ic">✦</span>نتیجه ادغام‌شده
+          ${merged.latency_sec != null ? `<span style="margin-right:auto;font-family:var(--ff-mono);font-size:.7rem;color:var(--mu)">${merged.latency_sec}ث</span>` : ''}
+        </div>
+        <div class="p-bd" style="font-size:.82rem;line-height:1.9;white-space:pre-wrap">${esc(merged.text || merged.error || '')}</div>
+      </div>`;
+    } catch (e) {
+      mergeCard.innerHTML = `<div class="msg">خطای ادغام: ${esc(e.message)}</div>`;
+    }
+    done++;
+    _asrSetProgress(done, totalSteps, 'انجام شد');
+  }
+
+  runBtn.disabled = false;
 }
 
 function renderCatList(cat, models, available) {
@@ -1992,15 +2651,15 @@ function moveCatModel(cat, idx, dir) {
   renderCatList(cat, arr, cfg.available||[]);
 }
 
-async function saveModelConfig() {
+async function saveModelConfig(btnId) {
   const cfg = ST._modelCfg || {};
   const body = {
     asr: cfg.asr||[], llm: cfg.llm||[],
-    translate: cfg.translate || false,
     asr_dual: cfg.asr_dual || false,
   };
   await fetch('/api/admin/model-config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
-  const btn = document.getElementById('cfg-save-btn');
+  const btn = document.getElementById(btnId || 'cfg-save-btn');
+  if (!btn) return;
   const orig = btn.textContent;
   btn.textContent = '✓ ذخیره شد';
   setTimeout(() => { btn.textContent = orig; }, 2000);
@@ -2075,31 +2734,37 @@ const PROMPT_LABELS = {
   summary:'خلاصه‌سازی', correct:'اصلاح رونویسی',
   paragraphs:'فصل‌بندی', sacred:'متون مقدس',
   quotes:'نقل‌قول‌ها', mentions:'اشاره‌ها',
+  transcribe:'رونویسی (ASR)',
 };
+// 'transcribe' renders in the رونویسی ASR tab (#asr-prompt-cfg-wrap) instead
+// of the general instructions grid — everything else stays on Overview.
+const _ASR_PROMPT_KEYS = new Set(['transcribe']);
 
 function renderPromptConfig(cfg) {
-  const wrap = document.getElementById('prompt-cfg-wrap');
-  if (!wrap) return;
-  wrap.innerHTML = '';
+  const general = document.getElementById('prompt-cfg-wrap');
+  const asrWrap = document.getElementById('asr-prompt-cfg-wrap');
+  if (general) general.innerHTML = '';
+  if (asrWrap) asrWrap.innerHTML = '';
   const cur = cfg.prompts || {};
   const def = cfg.defaults || {};
   Object.entries(PROMPT_LABELS).forEach(([key, label]) => {
+    const target = _ASR_PROMPT_KEYS.has(key) ? asrWrap : general;
+    if (!target) return;
     const div = document.createElement('div');
     div.className = 'panel';
     const val = cur[key] || '';
     div.innerHTML = `<div class="p-hd"><span class="p-hd-ic">✎</span>${label}</div>
       <div class="p-bd" style="padding:.6rem">
         <textarea class="prompt-ta" id="prompt-ta-${key}" placeholder="${esc(def[key]||'')}">${esc(val)}</textarea>
-        <div style="font-size:.63rem;color:var(--mu);margin-top:.25rem">خالی = دستورالعمل پیش‌فرض</div>
+        <div style="font-size:.63rem;color:var(--mu);margin-top:.25rem">خالی = پیش‌فرض: «${esc((def[key]||'').slice(0,80))}${(def[key]||'').length>80?'…':''}»</div>
       </div>`;
-    wrap.appendChild(div);
+    target.appendChild(div);
   });
 }
 
-async function savePromptConfig() {
-  const btn = document.getElementById('prompt-save-btn');
-  btn.textContent = '...';
-  btn.disabled = true;
+async function savePromptConfig(btnId) {
+  const btn = document.getElementById(btnId || 'prompt-save-btn');
+  if (btn) { btn.textContent = '...'; btn.disabled = true; }
   const prompts = {};
   Object.keys(PROMPT_LABELS).forEach(key => {
     const el = document.getElementById('prompt-ta-' + key);
@@ -2112,6 +2777,7 @@ async function savePromptConfig() {
       body: JSON.stringify(prompts),
     });
   } catch(e) { alert('خطا: ' + e.message); }
+  if (!btn) return;
   btn.textContent = 'ذخیره';
   btn.disabled = false;
 }
@@ -2127,6 +2793,22 @@ function resetPromptConfig() {
 async function reprocess(id) {
   await fetch(`/api/items/${id}/reprocess`, {method:'POST'});
   loadAdmin();
+}
+
+async function uploadSubtitle(e) {
+  const file = e.target.files?.[0];
+  e.target.value = '';
+  if (!file || !ST.id) return;
+  if (!/\.(srt|vtt)$/i.test(file.name)) { alert('فقط فایل srt یا vtt پشتیبانی می‌شود'); return; }
+
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const r = await fetch(`/api/items/${ST.id}/subtitle`, {method:'POST', body: fd}).then(res => res.json());
+    if (r.error || r.detail) { alert(r.error || r.detail); return; }
+    alert(`زیرنویس بارگذاری شد (${r.segments} بخش). پردازش دوباره آغاز شد.`);
+    openPlayer(ST.id);
+  } catch(err) { alert('خطا در آپلود زیرنویس: ' + err.message); }
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -2156,7 +2838,7 @@ function fmtDur(s) {
 }
 
 function srcLabel(src) {
-  return {youtube:'YouTube',aparat:'آپارات',upload:'آپلود',direct:'لینک مستقیم',vimeo:'Vimeo',soundcloud:'SoundCloud'}[src] || src || '?';
+  return {youtube:'YouTube',aparat:'آپارات',telewebion:'تلوبیون',upload:'آپلود',direct:'لینک مستقیم',vimeo:'Vimeo',soundcloud:'SoundCloud'}[src] || src || '?';
 }
 
 function statusPill(st) {

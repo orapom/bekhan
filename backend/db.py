@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS items (
     language        TEXT DEFAULT 'fa',
     collections_json TEXT DEFAULT '[]',
     tags_json       TEXT DEFAULT '[]',
+    preferred_quality TEXT DEFAULT 'best',
     status          TEXT NOT NULL DEFAULT 'indexed',
     error_msg       TEXT,
     created_at      TEXT NOT NULL DEFAULT (datetime('now')),
@@ -86,6 +87,7 @@ def init_db():
             "ALTER TABLE pipeline_state ADD COLUMN model_used TEXT",
             "ALTER TABLE pipeline_state ADD COLUMN progress_pct INTEGER DEFAULT 0",
             "ALTER TABLE transcript_segments ADD COLUMN speaker TEXT",
+            "ALTER TABLE items ADD COLUMN preferred_quality TEXT DEFAULT 'best'",
         ]:
             try:
                 conn.execute(migration)
@@ -117,7 +119,8 @@ def upsert_item(data: dict) -> str:
             sid = existing['id']
             updateable = ['type', 'source', 'title', 'title_fa', 'url_source', 'url_thumbnail',
                           'file_path', 'duration_sec', 'date_published', 'language',
-                          'collections_json', 'tags_json', 'status', 'error_msg']
+                          'collections_json', 'tags_json', 'status', 'error_msg',
+                          'preferred_quality']
             updates = [(f, data[f]) for f in updateable if f in data]
             if updates:
                 set_clause = ', '.join(f"{f}=?" for f, _ in updates)
@@ -129,7 +132,7 @@ def upsert_item(data: dict) -> str:
             cols = ['id', 'type', 'source', 'external_id', 'title', 'title_fa',
                     'url_source', 'url_thumbnail', 'file_path', 'duration_sec',
                     'date_published', 'language', 'collections_json', 'tags_json',
-                    'status', 'created_at', 'updated_at']
+                    'status', 'preferred_quality', 'created_at', 'updated_at']
             merged = {'id': sid, 'created_at': _now(), 'updated_at': _now(), **data}
             present = [c for c in cols if c in merged]
             conn.execute(

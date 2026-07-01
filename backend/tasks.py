@@ -56,10 +56,12 @@ def _m():
 
 
 def _pipeline_chain(item_id: str):
+    # Note: EN translation step removed from the pipeline per user preference.
+    # translate_item/translate_to_english are left in place (unused) in case
+    # this is wanted again later — nothing currently calls them.
     return chain(
         transcribe_item.si(item_id),
         correct_transcript.si(item_id),
-        translate_item.si(item_id),
         diarize_item.si(item_id),
         generate_paragraphs.si(item_id),
         summarize_item.si(item_id),
@@ -212,9 +214,15 @@ def transcribe_item(self, item_id: str):
     _ps(item_id, 'transcribe', 'running')
     db.set_status(item_id, 'transcribing')
     try:
-        from ai_client import transcribe_audio, transcribe_audio_dual, _model_config
+        from ai_client import transcribe_audio, transcribe_audio_dual, _model_config, _load_prompts
         lang = item.get('language') or 'fa'
         title_hint = ((item.get('title') or item.get('title_fa') or '')[:150])
+        asr_prompt = (_load_prompts().get('transcribe') or '').strip()
+        # ASR 'prompt' is priming context, not an instruction — Whisper-style
+        # models condition on it as if it were preceding transcript text, so
+        # we append it after the title to bias spelling/vocabulary of names
+        # and terms that recur across the archive.
+        title_hint = f"{title_hint}. {asr_prompt}"[:200] if asr_prompt else title_hint
 
         def _on_progress(done: int, total: int):
             pct = int(done / total * 100) if total > 0 else 0
@@ -281,11 +289,17 @@ def correct_transcript(self, item_id: str):
                  for r in segs_raw]
 
     _ps(item_id, 'correct', 'running')
+
+    def _on_progress(done: int, total: int):
+        pct = int(done / total * 100) if total > 0 else 0
+        _ps(item_id, 'correct', 'running', progress_pct=pct)
+
     try:
         corrected = _run(correct_transcript_segments(
             seg_dicts,
             title=item.get('title') or item.get('title_fa') or '',
             language=item.get('language') or 'fa',
+            on_progress=_on_progress,
         ))
         llm_model = _m()
         conn2 = db.get_conn()
@@ -330,8 +344,13 @@ def translate_item(self, item_id: str):
                  for r in segs_raw]
 
     _ps(item_id, 'translate', 'running')
+
+    def _on_progress(done: int, total: int):
+        pct = int(done / total * 100) if total > 0 else 0
+        _ps(item_id, 'translate', 'running', progress_pct=pct)
+
     try:
-        translated = _run(translate_to_english(seg_dicts))
+        translated = _run(translate_to_english(seg_dicts, on_progress=_on_progress))
         used: str = _m() or LLM_MODEL or ''
         db.save_segments(item_id, 'en', translated)
         _ps(item_id, 'translate', 'done', model=used)
@@ -365,9 +384,15 @@ def diarize_item(self, item_id: str):
                  for r in segs_raw]
 
     _ps(item_id, 'diarize', 'running')
+
+    def _on_progress(done: int, total: int):
+        pct = int(done / total * 100) if total > 0 else 0
+        _ps(item_id, 'diarize', 'running', progress_pct=pct)
+
     try:
         result = _run(diarize_speakers(
-            seg_dicts, title=item.get('title') or item.get('title_fa') or ''
+            seg_dicts, title=item.get('title') or item.get('title_fa') or '',
+            on_progress=_on_progress,
         ))
         used: str = _m() or LLM_MODEL or ''
         db.save_ai_content(item_id, 'speakers', 'fa',
@@ -418,9 +443,15 @@ def generate_paragraphs(self, item_id: str):
                  for r in segs_raw]
 
     _ps(item_id, 'paragraphs', 'running')
+
+    def _on_progress(done: int, total: int):
+        pct = int(done / total * 100) if total > 0 else 0
+        _ps(item_id, 'paragraphs', 'running', progress_pct=pct)
+
     try:
         paras = _run(generate_book_paragraphs(
-            seg_dicts, title=item.get('title') or item.get('title_fa') or ''
+            seg_dicts, title=item.get('title') or item.get('title_fa') or '',
+            on_progress=_on_progress,
         ))
         used: str = _m() or LLM_MODEL or ''
         db.save_ai_content(item_id, 'paragraphs', 'fa',

@@ -15,3 +15,9 @@ logs:
 
 shell:
 	docker compose exec api bash
+
+backup:
+	docker compose exec api python backup.py
+
+backup-full:
+	docker compose exec api python backup.py --media
